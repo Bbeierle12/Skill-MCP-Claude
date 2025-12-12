@@ -1,0 +1,11 @@
+{
+  "name": "building",
+  "description": "3D building game mechanics including construction systems, physics, multiplayer sync, and terrain manipulation for games like Minecraft, Rust, or Fortnite-style builders.",
+  "tags": ["building", "3D", "game", "physics", "multiplayer", "voxel", "construction"],
+  "sub_skills": [
+    {"name": "performance", "file": "references/performance.md", "triggers": ["optimization", "LOD", "culling", "instancing", "batching"]},
+    {"name": "physics", "file": "references/physics.md", "triggers": ["collision", "structural integrity", "gravity", "rigidbody"]},
+    {"name": "multiplayer", "file": "references/multiplayer.md", "triggers": ["sync", "netcode", "replication", "server authority"]},
+    {"name": "terrain", "file": "references/terrain.md", "triggers": ["voxel", "terrain", "procedural", "chunk"]}
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "name": "3d-building-advanced",
+  "description": "name: building-mechanics description: Three.js 3D building system with spatial indexing, structural physics, and multiplayer networking. Use when creating survival games, sandbox builders, or any game",
+  "tags": [
+    "rust",
+    "multiplayer",
+    "three.js",
+    "caching",
+    "sync",
+    "optimization",
+    "performance",
+    "javascript",
+    "networking",
+    "validation"
+  ],
+  "sub_skills": [
+    {
+      "name": "multiplayer-networking",
+      "file": "references/multiplayer-networking.md",
+      "triggers": [
+        "localPiece",
+        "tempId",
+        "Delta Compression",
+        "multiplayer-networking",
+        "The Networking Challenge",
+        "BuildingPermissionSystem",
+        "UpdateBatcher",
+        "Authority Models",
+        "updatePredictions",
+        "pending"
+      ]
+    },
+    {
+      "name": "performance-at-scale",
+      "file": "references/performance-at-scale.md",
+      "triggers": [
+        "Spatial Data Structures",
+        "cy",
+        "GPU Instancing",
+        "performance-at-scale",
+        "createBuildingLOD",
+        "SpatialHashGrid",
+        "cx",
+        "The Scale Problem",
+        "ChunkManager",
+        "Occlusion Culling"
+      ]
+    },
+    {
+      "name": "structural-physics-advanced",
+      "file": "references/structural-physics-advanced.md",
+      "triggers": [
+        "supportStability",
+        "Visual Feedback",
+        "disconnected",
+        "SupportGraph",
+        "supports",
+        "structural-physics-advanced",
+        "onPieceDestroyed",
+        "The Physics Spectrum",
+        "StabilitySystem",
+        "Choosing Your Approach"
+      ]
+    }
+  ]
+}

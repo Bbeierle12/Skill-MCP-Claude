@@ -1,0 +1,10 @@
+{
+  "name": "dashboard",
+  "description": "Data dashboard development patterns including charts, real-time updates, filtering, and responsive layouts for analytics applications.",
+  "tags": ["dashboard", "charts", "analytics", "data-viz", "real-time", "D3", "recharts"],
+  "sub_skills": [
+    {"name": "charts", "file": "references/charts.md", "triggers": ["chart", "graph", "D3", "recharts", "visualization"]},
+    {"name": "real-time", "file": "references/real-time.md", "triggers": ["WebSocket", "live", "streaming", "real-time"]},
+    {"name": "filtering", "file": "references/filtering.md", "triggers": ["filter", "search", "query", "facet"]}
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "component-library",
+  "description": "Building and maintaining React/Vue component libraries with design systems, documentation, testing, and publishing patterns.",
+  "tags": ["components", "design-system", "storybook", "testing", "npm", "monorepo"],
+  "sub_skills": []
+}

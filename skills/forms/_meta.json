@@ -1,0 +1,14 @@
+{
+  "name": "forms",
+  "description": "Web form development patterns for React, Vue, and vanilla JS. Includes validation, accessibility, security, and UX patterns.",
+  "tags": ["forms", "validation", "react", "vue", "accessibility", "zod"],
+  "sub_skills": [
+    {"name": "accessibility", "file": "references/accessibility.md", "triggers": ["WCAG", "ARIA", "screen reader", "a11y"]},
+    {"name": "validation", "file": "references/validation.md", "triggers": ["zod", "schema", "validate", "error"]},
+    {"name": "security", "file": "references/security.md", "triggers": ["CSRF", "XSS", "autocomplete", "password"]},
+    {"name": "react", "file": "references/react.md", "triggers": ["React", "useForm", "RHF", "TanStack"]},
+    {"name": "vue", "file": "references/vue.md", "triggers": ["Vue", "VeeValidate", "Vuelidate"]},
+    {"name": "vanilla", "file": "references/vanilla.md", "triggers": ["vanilla", "plain JS", "no framework"]},
+    {"name": "ux-patterns", "file": "references/ux-patterns.md", "triggers": ["wizard", "multi-step", "stepper"]}
+  ]
+}
