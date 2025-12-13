@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "skills": {
+      "command": "python",
+      "args": ["/home/user/Skill-MCP-Claude/server.py"]
+    }
+  }
+}
