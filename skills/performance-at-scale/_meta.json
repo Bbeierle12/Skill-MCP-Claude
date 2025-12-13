@@ -1,0 +1,16 @@
+{
+  "name": "performance-at-scale",
+  "description": "Spatial indexing and world streaming for large-scale building systems. import { SpatialHashGrid } from './scripts/spatial-hash-grid.js';",
+  "tags": [
+    "javascript",
+    "ui",
+    "performance",
+    "scale",
+    "user",
+    "forms",
+    "threejs",
+    "game"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

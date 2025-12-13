@@ -1,0 +1,14 @@
+{
+  "name": "multiplayer-building",
+  "description": "Networking layer for multiplayer building games. import { BuildingNetworkServer, BuildingNetworkClient } from './scripts/building-network-manager.js';",
+  "tags": [
+    "javascript",
+    "ui",
+    "building",
+    "user",
+    "multiplayer",
+    "game"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

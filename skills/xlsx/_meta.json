@@ -1,0 +1,16 @@
+{
+  "name": "xlsx",
+  "description": "- Every Excel model MUST be delivered with ZERO formula errors (#REF!, #DIV/0!, #VALUE!, #N/A, #NAME?) - Study and EXACTLY match existing format, style, and conventions when modifying files",
+  "tags": [
+    "documentation",
+    "ui",
+    "ux",
+    "python",
+    "xlsx",
+    "public",
+    "spreadsheet",
+    "forms"
+  ],
+  "sub_skills": [],
+  "source": "claude-public"
+}

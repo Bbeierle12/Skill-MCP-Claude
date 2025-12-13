@@ -277,9 +277,9 @@
         
         <!-- Drop Zone -->
         <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-green-500 transition cursor-pointer" onclick="document.getElementById('multiFileInput').click()">
-          <input type="file" id="multiFileInput" multiple webkitdirectory class="hidden" onchange="handleMultiFileSelect(event)">
+          <input type="file" id="multiFileInput" multiple class="hidden" onchange="handleMultiFileSelect(event)">
           <i data-lucide="upload-cloud" class="w-12 h-12 mx-auto text-gray-500 mb-3"></i>
-          <p class="text-gray-300 font-medium">Drop files or folder here</p>
+          <p class="text-gray-300 font-medium">Drop files here</p>
           <p class="text-gray-500 text-sm mt-1">Or click to browse</p>
         </div>
         
@@ -416,6 +416,9 @@
     let generatedSkillData = null;
     let selectedFolderPath = null;
     let selectedFiles = [];
+    
+    // Store paths safely to avoid escaping issues
+    let browsePathCache = {};
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
@@ -605,10 +608,11 @@
       lucide.createIcons();
     }
 
-    // === Folder Browser ===
+    // === Folder Browser (FIXED) ===
     function openFolderBrowser() {
       toggleImportMenu();
       selectedFolderPath = null;
+      browsePathCache = {};
       document.getElementById('importFolderBtn').disabled = true;
       document.getElementById('selectedFolder').classList.add('hidden');
       document.getElementById('folderPath').value = '';
@@ -621,6 +625,21 @@
     function closeFolderBrowser() { document.getElementById('folderModal').classList.add('hidden'); document.getElementById('folderModal').classList.remove('flex'); }
 
     function navigateToPath() { browsePath(document.getElementById('folderPath').value); }
+    
+    // Click handler that uses cached paths
+    function handleFolderClick(id) {
+      const path = browsePathCache[id];
+      if (path !== undefined) {
+        browsePath(path);
+      }
+    }
+    
+    function handleSelectFolder(id) {
+      const entry = browsePathCache[id];
+      if (entry) {
+        selectFolder(entry.path, entry.name);
+      }
+    }
 
     async function browsePath(path) {
       const contents = document.getElementById('folderContents');
@@ -630,18 +649,29 @@
         const res = await fetch(`${API_BASE}/api/browse?path=${encodeURIComponent(path)}`);
         const data = await res.json();
 
-        if (data.error) { contents.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`; return; }
+        if (data.error) { 
+          contents.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`; 
+          return; 
+        }
 
         document.getElementById('folderPath').value = data.path || '';
+        
+        // Clear and rebuild path cache
+        browsePathCache = {};
+        let idCounter = 0;
         
         // Breadcrumbs
         const crumbs = document.getElementById('breadcrumbs');
         if (data.path) {
           const parts = data.path.split(/[/\\]/).filter(p => p);
-          crumbs.innerHTML = parts.map((p, i) => {
-            const fullPath = parts.slice(0, i + 1).join('/');
-            return `<button onclick="browsePath('${fullPath.replace(/'/g, "\\'")}')" class="text-blue-400 hover:text-blue-300">${p}</button><span class="text-gray-600">/</span>`;
-          }).join('');
+          let crumbHtml = '';
+          for (let i = 0; i < parts.length; i++) {
+            const fullPath = parts.slice(0, i + 1).join('\\');
+            const crumbId = `crumb_${idCounter++}`;
+            browsePathCache[crumbId] = fullPath;
+            crumbHtml += `<button onclick="handleFolderClick('${crumbId}')" class="text-blue-400 hover:text-blue-300">${parts[i]}</button><span class="text-gray-600">/</span>`;
+          }
+          crumbs.innerHTML = crumbHtml;
         } else {
           crumbs.innerHTML = '';
         }
@@ -650,7 +680,9 @@
         
         // Parent directory
         if (data.parent) {
-          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="browsePath('${data.parent.replace(/'/g, "\\'")}')">
+          const parentId = `parent_${idCounter++}`;
+          browsePathCache[parentId] = data.parent;
+          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="handleFolderClick('${parentId}')">
             <i data-lucide="corner-left-up" class="w-5 h-5 text-gray-500"></i>
             <span class="text-gray-400">..</span>
           </div>`;
@@ -658,19 +690,30 @@
 
         // Directories
         for (const dir of data.dirs) {
+          const dirId = `dir_${idCounter++}`;
           const isSkill = dir.is_skill;
-          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer ${isSkill ? 'skill-folder bg-purple-900/20' : ''}" onclick="${isSkill ? `selectFolder('${dir.path.replace(/'/g, "\\'")}', '${dir.name}')` : `browsePath('${dir.path.replace(/'/g, "\\'")}')`}">
-            <i data-lucide="${isSkill ? 'folder-check' : 'folder'}" class="w-5 h-5 ${isSkill ? 'text-purple-400' : 'text-blue-400'}"></i>
-            <span class="${isSkill ? 'text-purple-300' : ''}">${dir.name}</span>
-            ${isSkill ? '<span class="ml-auto text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded">SKILL</span>' : ''}
-          </div>`;
+          
+          if (isSkill) {
+            browsePathCache[dirId] = { path: dir.path, name: dir.name };
+            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer skill-folder bg-purple-900/20" onclick="handleSelectFolder('${dirId}')">
+              <i data-lucide="folder-check" class="w-5 h-5 text-purple-400"></i>
+              <span class="text-purple-300">${escapeHtml(dir.name)}</span>
+              <span class="ml-auto text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded">SKILL</span>
+            </div>`;
+          } else {
+            browsePathCache[dirId] = dir.path;
+            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="handleFolderClick('${dirId}')">
+              <i data-lucide="folder" class="w-5 h-5 text-blue-400"></i>
+              <span>${escapeHtml(dir.name)}</span>
+            </div>`;
+          }
         }
 
         // Files (just for display)
         for (const file of data.files.slice(0, 20)) {
           html += `<div class="flex items-center gap-3 px-4 py-2 text-gray-500">
             <i data-lucide="file" class="w-4 h-4"></i>
-            <span class="text-sm">${file.name}</span>
+            <span class="text-sm">${escapeHtml(file.name)}</span>
           </div>`;
         }
 
@@ -679,6 +722,12 @@
       } catch (e) {
         contents.innerHTML = `<div class="text-red-400 text-center py-8">Error: ${e.message}</div>`;
       }
+    }
+    
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     function selectFolder(path, name) {
@@ -692,6 +741,7 @@
     async function importSelectedFolder() {
       if (!selectedFolderPath) return;
       document.getElementById('folderStatus').textContent = 'Importing...';
+      document.getElementById('importFolderBtn').disabled = true;
 
       try {
         const res = await fetch(`${API_BASE}/api/import/folder`, {
@@ -708,9 +758,11 @@
           showToast(`Imported ${data.files_imported} files!`);
         } else {
           showToast(data.error || 'Import failed', 'error');
+          document.getElementById('importFolderBtn').disabled = false;
         }
       } catch (e) {
         showToast('Error: ' + e.message, 'error');
+        document.getElementById('importFolderBtn').disabled = false;
       }
       document.getElementById('folderStatus').textContent = '';
     }
@@ -734,18 +786,11 @@
       selectedFiles = files;
       
       if (files.length > 0) {
-        // Try to infer skill name from folder structure
-        const firstPath = files[0].webkitRelativePath || files[0].name;
-        const parts = firstPath.split('/');
-        if (parts.length > 1 && !document.getElementById('fileSkillName').value) {
-          document.getElementById('fileSkillName').value = parts[0].toLowerCase().replace(/[^a-z0-9-]/g, '-');
-        }
-
         document.getElementById('fileCount').textContent = `${files.length} files selected`;
         document.getElementById('fileListItems').innerHTML = files.slice(0, 20).map(f => `
           <div class="px-4 py-2 flex items-center gap-2 text-sm">
             <i data-lucide="file" class="w-4 h-4 text-gray-500"></i>
-            <span class="text-gray-300 truncate">${f.webkitRelativePath || f.name}</span>
+            <span class="text-gray-300 truncate">${escapeHtml(f.name)}</span>
             <span class="text-gray-600 ml-auto">${(f.size / 1024).toFixed(1)}KB</span>
           </div>
         `).join('') + (files.length > 20 ? `<div class="px-4 py-2 text-gray-500 text-sm">...and ${files.length - 20} more</div>` : '');
@@ -768,12 +813,17 @@
       if (!skillName) { showToast('Enter skill name', 'error'); return; }
       if (selectedFiles.length === 0) { showToast('Select files', 'error'); return; }
 
+      document.getElementById('uploadFilesBtn').disabled = true;
+
       // Read files and send as JSON
       const filesData = [];
       for (const file of selectedFiles) {
-        const content = await file.text();
-        const path = file.webkitRelativePath ? file.webkitRelativePath.split('/').slice(1).join('/') : file.name;
-        filesData.push({ path, content, base64: false });
+        try {
+          const content = await file.text();
+          filesData.push({ path: file.name, content, base64: false });
+        } catch (e) {
+          console.error('Error reading file:', file.name, e);
+        }
       }
 
       try {
@@ -791,9 +841,11 @@
           showToast(`Uploaded ${data.files_imported.length} files!`);
         } else {
           showToast(data.error || 'Upload failed', 'error');
+          document.getElementById('uploadFilesBtn').disabled = false;
         }
       } catch (e) {
         showToast('Error: ' + e.message, 'error');
+        document.getElementById('uploadFilesBtn').disabled = false;
       }
     }
 
@@ -897,7 +949,7 @@
       if (!input) return;
       const skillName = document.getElementById('consoleSkillSelect').value;
       const output = document.getElementById('consoleOutput');
-      output.innerHTML += `<div class="text-blue-400 mt-4">❯ ${input}</div><div class="text-gray-500">Running...</div>`;
+      output.innerHTML += `<div class="text-blue-400 mt-4">❯ ${escapeHtml(input)}</div><div class="text-gray-500">Running...</div>`;
       output.scrollTop = output.scrollHeight;
 
       try {
@@ -910,11 +962,11 @@
         });
         const data = await res.json();
         output.lastChild.remove();
-        if (data.success) output.innerHTML += `<div class="text-green-300 whitespace-pre-wrap">${data.stdout || '(no output)'}</div>`;
-        else output.innerHTML += `<div class="text-red-400">${data.error}</div>`;
+        if (data.success) output.innerHTML += `<div class="text-green-300 whitespace-pre-wrap">${escapeHtml(data.stdout || '(no output)')}</div>`;
+        else output.innerHTML += `<div class="text-red-400">${escapeHtml(data.error)}</div>`;
       } catch (e) {
         output.lastChild.remove();
-        output.innerHTML += `<div class="text-red-400">Error: ${e.message}</div>`;
+        output.innerHTML += `<div class="text-red-400">Error: ${escapeHtml(e.message)}</div>`;
       }
       document.getElementById('consoleInput').value = '';
       output.scrollTop = output.scrollHeight;
@@ -959,7 +1011,7 @@
         e.preventDefault();
         dropZone.classList.remove('border-green-500', 'bg-green-900/20');
         if (e.dataTransfer.files.length) {
-          document.getElementById('multiFileInput').files = e.dataTransfer.files;
+          selectedFiles = Array.from(e.dataTransfer.files);
           handleMultiFileSelect({ target: { files: e.dataTransfer.files } });
         }
       });

@@ -1,0 +1,16 @@
+{
+  "name": "terrain-integration",
+  "description": "Foundation placement, slope handling, and terrain modification for building systems. import { TerrainAnalyzer } from './scripts/terrain-analyzer.js';",
+  "tags": [
+    "javascript",
+    "ui",
+    "user",
+    "physics",
+    "terrain",
+    "threejs",
+    "integration",
+    "game"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

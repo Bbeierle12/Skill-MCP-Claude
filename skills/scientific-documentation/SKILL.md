@@ -1,196 +1,51 @@
-# Scientific Documentation
+---
+name: scientific-documentation
+description: Generate comprehensive scientific research-style documentation for completed coding projects. Use when the user requests project documentation, a technical breakdown, a study paper, a lecture document, or wants to understand everything about a project they just built. Triggers include phrases like "document this project," "create a study paper," "explain everything we did," "write up the full breakdown," "scientific documentation," or "I want to learn from this project." Produces formal Word documents (.docx) with academic structure, beginner-friendly explanations, and exhaustive code analysis.
+---
 
-## LaTeX Essentials
+# Scientific Project Documentation Skill
 
-### Document Structure
+Generate exhaustive, research-grade documentation for coding projects that serves both as a learning resource and technical reference.
 
-```latex
-\documentclass[11pt,a4paper]{article}
+## Role
 
-\usepackage{amsmath,amssymb}  % Math
-\usepackage{graphicx}         % Images
-\usepackage{hyperref}         % Links
-\usepackage{booktabs}         % Better tables
-\usepackage[backend=biber,style=ieee]{biblatex}
+Act as a Principal Research Scientist and Computer Science Educator. Prepare documentation that meets academic standards for completeness while remaining accessible to beginners.
 
-\addbibresource{references.bib}
+## Primary Workflow
 
-\title{Your Paper Title}
-\author{Author Name \\ \texttt{email@example.com}}
-\date{\today}
+1. **Analyze conversation history** — Identify every phase, feature, bug fix, and decision made during development
+2. **Read the document template** — Load `references/document-template.md` for the complete structure specification
+3. **Read the docx skill** — Load `/mnt/skills/public/docx/SKILL.md` and its `docx-js.md` reference for Word document creation
+4. **Generate the document** — Create a comprehensive .docx file following the template structure
+5. **Deliver to user** — Save to `/mnt/user-data/outputs/` with a descriptive filename
 
-\begin{document}
-\maketitle
-\begin{abstract}
-Your abstract here.
-\end{abstract}
+## Output Specifications
 
-\section{Introduction}
-\label{sec:intro}
+| Attribute | Requirement |
+|-----------|-------------|
+| Format | Microsoft Word (.docx) |
+| Length | 6,000–10,000 words (15-25 pages) |
+| Audience | First-year CS student with basic syntax knowledge |
+| Typography | Georgia body, Arial headings, Courier New for code |
 
-\section{Methodology}
+## Quality Standards
 
-\section{Results}
+**Completeness** — Document every feature, technique, and decision. Leave no stone unturned.
 
-\section{Conclusion}
+**Accuracy** — All code references must match the actual implementation with correct line numbers or function names.
 
-\printbibliography
-\end{document}
-```
+**Accessibility** — A motivated beginner must be able to follow every explanation. Never skip "obvious" concepts.
 
-### Mathematical Notation
+**Pedagogical Depth** — Explain not just *what* code does, but *why* it was written that way and *how* the underlying principles work.
 
-```latex
-% Inline math
-The equation $E = mc^2$ describes...
+## Tone Guidelines
 
-% Display math
-\begin{equation}
-\label{eq:bayes}
-P(A|B) = \frac{P(B|A) \cdot P(A)}{P(B)}
-\end{equation}
+Write in complete prose paragraphs. Maintain academic formality while remaining warm and encouraging. Anticipate confusion and address it proactively. Use phrases like "Notice that..." and "This is important because..." to guide attention. Never assume prior knowledge without briefly reviewing it.
 
-% Aligned equations
-\begin{align}
-f(x) &= x^2 + 2x + 1 \\
-     &= (x + 1)^2
-\end{align}
+## Anti-Patterns to Avoid
 
-% Matrices
-\begin{pmatrix}
-a & b \\
-c & d
-\end{pmatrix}
-```
-
-## Markdown + Extensions
-
-### Mathematical Equations (KaTeX/MathJax)
-
-```markdown
-Inline: $E = mc^2$
-
-Block:
-$$
-\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
-$$
-```
-
-### Mermaid Diagrams
-
-```markdown
-```mermaid
-flowchart TD
-    A[Data Collection] --> B[Preprocessing]
-    B --> C[Feature Extraction]
-    C --> D[Model Training]
-    D --> E{Validation}
-    E -->|Pass| F[Deployment]
-    E -->|Fail| C
-```
-```
-
-### Tables
-
-```markdown
-| Method    | Accuracy | F1 Score | Time (ms) |
-|-----------|----------|----------|-----------|
-| Baseline  | 0.82     | 0.79     | 12        |
-| Proposed  | **0.91** | **0.88** | 15        |
-| SOTA      | 0.89     | 0.86     | 45        |
-```
-
-## Citation Management
-
-### BibTeX Entry Types
-
-```bibtex
-@article{smith2023,
-  author  = {Smith, John and Doe, Jane},
-  title   = {A Novel Approach to X},
-  journal = {Journal of Computing},
-  year    = {2023},
-  volume  = {42},
-  pages   = {1--15},
-  doi     = {10.1234/joc.2023.001}
-}
-
-@inproceedings{doe2022,
-  author    = {Doe, Jane},
-  title     = {Conference Paper Title},
-  booktitle = {Proceedings of CONF 2022},
-  year      = {2022},
-  pages     = {100--110}
-}
-
-@misc{repo2023,
-  author       = {Developer, A},
-  title        = {Open Source Project},
-  year         = {2023},
-  howpublished = {\url{https://github.com/...}},
-  note         = {Accessed: 2023-12-01}
-}
-```
-
-### Citation Commands
-
-```latex
-\cite{smith2023}           % [1]
-\citet{smith2023}          % Smith et al. [1]
-\citep{smith2023}          % [Smith et al., 2023]
-\cite{smith2023,doe2022}   % [1, 2]
-```
-
-## Diagrams
-
-### PlantUML
-
-```plantuml
-@startuml
-participant Client
-participant Server
-participant Database
-
-Client -> Server: Request
-Server -> Database: Query
-Database --> Server: Results
-Server --> Client: Response
-@enduml
-```
-
-### TikZ (LaTeX)
-
-```latex
-\begin{tikzpicture}
-\node[rectangle,draw] (a) at (0,0) {Input};
-\node[rectangle,draw] (b) at (3,0) {Process};
-\node[rectangle,draw] (c) at (6,0) {Output};
-\draw[->] (a) -- (b);
-\draw[->] (b) -- (c);
-\end{tikzpicture}
-```
-
-## Writing Guidelines
-
-### Structure
-1. **Abstract**: Problem, approach, key results (150-300 words)
-2. **Introduction**: Context, problem statement, contributions
-3. **Related Work**: Prior approaches, gaps
-4. **Methodology**: Your approach in detail
-5. **Experiments/Results**: Setup, metrics, findings
-6. **Discussion**: Interpretation, limitations
-7. **Conclusion**: Summary, future work
-
-### Style Tips
-- Use active voice: "We propose..." not "It is proposed..."
-- Be precise with numbers: "improved by 12%" not "significantly improved"
-- Define acronyms on first use
-- Use consistent terminology throughout
-- Cite primary sources, not reviews
-
-### Common Mistakes
-- Overclaiming results
-- Missing related work
-- Insufficient experimental details
-- Poor figure/table captions
-- Inconsistent notation
+- Skipping "simple" code because it seems obvious
+- Using jargon without definition
+- Referencing code without showing it
+- Bullet-point lists where prose would teach better
+- Shallow explanations that describe *what* without *why*

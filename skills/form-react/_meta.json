@@ -1,0 +1,17 @@
+{
+  "name": "form-react",
+  "description": "Production React form patterns. Default stack: **React Hook Form + Zod**. npm install react-hook-form @hookform/resolvers zod",
+  "tags": [
+    "react",
+    "api",
+    "typescript",
+    "accessibility",
+    "components",
+    "ui",
+    "html",
+    "validation",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

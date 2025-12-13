@@ -302,17 +302,17 @@ def open_browser():
     webbrowser.open(f"http://{HOST}:{PORT}")
 
 def main():
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║                    Skills Manager                            ║
-╠══════════════════════════════════════════════════════════════╣
-║  Server:     http://{HOST}:{PORT}                              ║
-║  Skills:     {str(SKILLS_DIR):<44} ║
-║  Claude CLI: {str(find_claude_cli() or 'Not found'):<44} ║
-╠══════════════════════════════════════════════════════════════╣
-║  Press Ctrl+C to stop                                        ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+    print("")
+    print("=" * 60)
+    print("                    SKILLS MANAGER")
+    print("=" * 60)
+    print(f"  Server:     http://{HOST}:{PORT}")
+    print(f"  Skills:     {SKILLS_DIR}")
+    print(f"  Claude CLI: {find_claude_cli() or 'Not found'}")
+    print("-" * 60)
+    print("  Press Ctrl+C to stop")
+    print("=" * 60)
+    print("")
     
     if is_port_in_use(PORT):
         print(f"[!] Port {PORT} in use. Opening browser...")

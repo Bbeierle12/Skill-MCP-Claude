@@ -1,0 +1,17 @@
+{
+  "name": "forms-router",
+  "description": "Routes to 7 specialized skills based on task requirements. 1. **Classify** \u2014 Identify framework + form type",
+  "tags": [
+    "react",
+    "javascript",
+    "typescript",
+    "accessibility",
+    "api",
+    "ui",
+    "ux",
+    "validation",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

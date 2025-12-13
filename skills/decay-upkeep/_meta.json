@@ -1,0 +1,16 @@
+{
+  "name": "decay-upkeep",
+  "description": "Timer-based building decay and resource-based upkeep for survival games. import { DecayManager } from './scripts/decay-manager.js';",
+  "tags": [
+    "upkeep",
+    "javascript",
+    "ui",
+    "user",
+    "decay",
+    "forms",
+    "design",
+    "game"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "form-security",
+  "description": "Security-first patterns for web forms. Ensures password manager compatibility, prevents common attacks, and protects user data. // The 3 critical security patterns",
+  "tags": [
+    "react",
+    "api",
+    "typescript",
+    "ui",
+    "components",
+    "html",
+    "validation",
+    "form",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

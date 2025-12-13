@@ -1,6 +1,15 @@
 {
   "name": "scientific-documentation",
-  "description": "Writing technical and scientific documentation with LaTeX, Markdown, diagrams, and citation management for research papers and technical specs.",
-  "tags": ["documentation", "LaTeX", "markdown", "diagrams", "citations", "research"],
-  "sub_skills": []
+  "description": "Generate exhaustive, research-grade documentation for coding projects that serves both as a learning resource and technical reference. Act as a Principal Research Scientist and Computer Science Educator. Prepare documentation that meets academic standards for completeness while remaining accessible ",
+  "tags": [
+    "accessibility",
+    "documentation",
+    "ui",
+    "scientific",
+    "docx",
+    "user",
+    "forms"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
 }

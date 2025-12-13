@@ -1,6 +1,17 @@
 {
   "name": "component-library",
-  "description": "Building and maintaining React/Vue component libraries with design systems, documentation, testing, and publishing patterns.",
-  "tags": ["components", "design-system", "storybook", "testing", "npm", "monorepo"],
-  "sub_skills": []
+  "description": "Generate production-ready React components with shadcn/ui patterns, saving 8-10 hours per project. When generating components:",
+  "tags": [
+    "react",
+    "accessibility",
+    "css",
+    "typescript",
+    "component",
+    "documentation",
+    "html",
+    "validation",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
 }

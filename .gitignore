@@ -4,28 +4,36 @@ __pycache__/
 *$py.class
 *.so
 .Python
-*.egg-info/
-.eggs/
-dist/
 build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# PyInstaller
+*.spec
+
+# Virtual environments
 venv/
-.venv/
+ENV/
 env/
-.env
+.venv/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Temp files
-_temp_extract/
+# Project specific
 *.log
+*.tmp
 
-# Empty working directory
-MCP-servers/
+# Keep skills folder but ignore contents for git
+# skills/*
+# !skills/.gitkeep

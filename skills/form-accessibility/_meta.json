@@ -1,0 +1,17 @@
+{
+  "name": "form-accessibility",
+  "description": "WCAG 2.2 AA compliance patterns for forms. Ensures forms work for keyboard users, screen reader users, and users with cognitive or motor disabilities. // Accessible form field pattern",
+  "tags": [
+    "react",
+    "accessibility",
+    "typescript",
+    "ui",
+    "css",
+    "html",
+    "validation",
+    "form",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

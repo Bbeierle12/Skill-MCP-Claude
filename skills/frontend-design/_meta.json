@@ -1,0 +1,17 @@
+{
+  "name": "frontend-design",
+  "description": "Before coding, understand the context and commit to a BOLD aesthetic direction: - **Purpose**: What problem does this interface solve? Who uses it?",
+  "tags": [
+    "react",
+    "accessibility",
+    "css",
+    "ui",
+    "components",
+    "ux",
+    "html",
+    "public",
+    "forms"
+  ],
+  "sub_skills": [],
+  "source": "claude-public"
+}

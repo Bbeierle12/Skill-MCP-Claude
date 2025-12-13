@@ -1,0 +1,17 @@
+{
+  "name": "form-vue",
+  "description": "Production Vue 3 form patterns. Default stack: **VeeValidate + Zod**. npm install vee-validate @vee-validate/zod zod",
+  "tags": [
+    "react",
+    "api",
+    "typescript",
+    "ui",
+    "components",
+    "validation",
+    "form",
+    "user",
+    "forms"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

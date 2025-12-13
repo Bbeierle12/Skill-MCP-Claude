@@ -1,0 +1,17 @@
+{
+  "name": "building-router",
+  "description": "Routes to 9 specialized skills based on game requirements. 1. **Classify** \u2014 Single/multiplayer + scale + core features",
+  "tags": [
+    "accessibility",
+    "ux",
+    "ui",
+    "building",
+    "3d",
+    "router",
+    "user",
+    "multiplayer",
+    "terrain"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

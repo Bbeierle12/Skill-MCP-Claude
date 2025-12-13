@@ -1,0 +1,16 @@
+{
+  "name": "product-self-knowledge",
+  "description": "1. **Accuracy over guessing** - Check official docs when uncertain 2. **Distinguish products** - Claude.ai, Claude Code, and Claude API are separate products",
+  "tags": [
+    "api",
+    "documentation",
+    "ui",
+    "product",
+    "self",
+    "public",
+    "forms",
+    "knowledge"
+  ],
+  "sub_skills": [],
+  "source": "claude-public"
+}

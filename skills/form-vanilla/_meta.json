@@ -1,0 +1,17 @@
+{
+  "name": "form-vanilla",
+  "description": "Framework-free form patterns using native browser APIs enhanced with Zod. id=\"email\"",
+  "tags": [
+    "react",
+    "javascript",
+    "typescript",
+    "ui",
+    "api",
+    "html",
+    "validation",
+    "form",
+    "user"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

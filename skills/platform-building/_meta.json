@@ -1,0 +1,17 @@
+{
+  "name": "platform-building",
+  "description": "Touch controls, VR input, and accessibility patterns for building systems. import { TouchBuildController } from './scripts/touch-build-controller.js';",
+  "tags": [
+    "platform",
+    "javascript",
+    "accessibility",
+    "ui",
+    "building",
+    "user",
+    "forms",
+    "design",
+    "game"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}

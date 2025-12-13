@@ -1,0 +1,17 @@
+{
+  "name": "pptx",
+  "description": "Create, edit, or analyze the contents of .pptx files when requested. A .pptx file is essentially a ZIP archive containing XML files and other resources. Different tools and workflows are available for different tasks. **Before starting any presentation task**, read ALL relevant documentation files c",
+  "tags": [
+    "react",
+    "javascript",
+    "css",
+    "documentation",
+    "api",
+    "python",
+    "html",
+    "validation",
+    "public"
+  ],
+  "sub_skills": [],
+  "source": "claude-public"
+}

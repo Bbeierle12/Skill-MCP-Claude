@@ -1,0 +1,16 @@
+{
+  "name": "router-template",
+  "description": "Routes to N specialized skills based on task requirements. 1. **Classify** \u2014 Identify primary task type from user request",
+  "tags": [
+    "react",
+    "accessibility",
+    "ui",
+    "template",
+    "router",
+    "user",
+    "forms",
+    "vue"
+  ],
+  "sub_skills": [],
+  "source": "claude-user"
+}
