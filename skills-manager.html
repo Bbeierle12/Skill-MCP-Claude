@@ -65,13 +65,14 @@
                 <div class="text-xs text-gray-400">Create from scratch</div>
               </div>
             </button>
-            <button onclick="openFolderBrowser()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
+            <button onclick="triggerNativeFolderPicker()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
               <i data-lucide="folder-input" class="w-5 h-5 text-blue-400"></i>
               <div>
                 <div class="font-medium">Import Folder</div>
-                <div class="text-xs text-gray-400">From local directory</div>
+                <div class="text-xs text-gray-400">Open file explorer</div>
               </div>
             </button>
+            <input type="file" id="nativeFolderInput" webkitdirectory directory multiple class="hidden" onchange="handleNativeFolderSelect(event)">
             <button onclick="openFileImport()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
               <i data-lucide="files" class="w-5 h-5 text-green-400"></i>
               <div>
@@ -606,6 +607,57 @@
       document.getElementById('importModal').classList.remove('hidden');
       document.getElementById('importModal').classList.add('flex');
       lucide.createIcons();
+    }
+
+    // === Native Folder Picker ===
+    function triggerNativeFolderPicker() {
+      toggleImportMenu();
+      document.getElementById('nativeFolderInput').click();
+    }
+
+    async function handleNativeFolderSelect(event) {
+      const files = Array.from(event.target.files);
+      if (files.length === 0) return;
+      
+      // Get the folder name from the first file's path
+      const firstPath = files[0].webkitRelativePath;
+      const folderName = firstPath.split('/')[0];
+      
+      showToast(`Importing "${folderName}" with ${files.length} files...`, 'info');
+      
+      // Read all files and send as JSON
+      const filesData = [];
+      for (const file of files) {
+        try {
+          const relativePath = file.webkitRelativePath.split('/').slice(1).join('/');
+          if (!relativePath) continue;
+          const content = await file.text();
+          filesData.push({ path: relativePath, content, base64: false });
+        } catch (e) {
+          console.error('Error reading:', file.name, e);
+        }
+      }
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/import/json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skill_name: folderName, files: filesData })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          showToast(`Imported "${data.name}" (${data.files_imported.length} files)`, 'success');
+          loadSkills();
+        } else {
+          showToast(data.error || 'Import failed', 'error');
+        }
+      } catch (e) {
+        showToast('Import error: ' + e.message, 'error');
+      }
+      
+      // Reset the input
+      event.target.value = '';
     }
 
     // === Folder Browser (FIXED) ===
