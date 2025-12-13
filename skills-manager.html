@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skills Manager - MCP + Claude Code</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .skill-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139, 92, 246, 0.15); }
+    .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+    .connecting { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .claude-glow { box-shadow: 0 0 20px rgba(251, 146, 60, 0.3); }
+    .typing::after { content: '▋'; animation: blink 1s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .folder-item:hover { background: rgba(139, 92, 246, 0.1); }
+    .skill-folder { border-left: 3px solid #a855f7; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-900 to-purple-950 text-gray-100 min-h-screen">
+  <div id="app" class="max-w-7xl mx-auto p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-bold text-white flex items-center gap-3">
+          <i data-lucide="brain" class="w-9 h-9 text-purple-400"></i>
+          Skills Manager
+        </h1>
+        <div class="flex items-center gap-4 mt-2">
+          <span id="connectionStatus" class="flex items-center gap-1">
+            <span class="w-2 h-2 bg-yellow-500 rounded-full connecting"></span>
+            <span class="text-yellow-400 text-sm">Connecting...</span>
+          </span>
+          <span class="text-gray-600">|</span>
+          <span id="claudeStatus" class="flex items-center gap-1">
+            <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+            <span class="text-gray-500 text-sm">Claude CLI</span>
+          </span>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="openClaudeConsole()" id="claudeBtn" class="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/50 text-orange-400 rounded-lg flex items-center gap-2 transition text-sm disabled:opacity-50" disabled>
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          Claude
+        </button>
+        <button onclick="refreshSkills()" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg flex items-center gap-2 transition text-sm">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+        
+        <!-- Import Dropdown -->
+        <div class="relative" id="importDropdown">
+          <button onclick="toggleImportMenu()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 transition font-medium shadow-lg shadow-purple-900/30">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            Import
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </button>
+          <div id="importMenu" class="hidden absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+            <button onclick="openImportModal()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition">
+              <i data-lucide="file-plus" class="w-5 h-5 text-purple-400"></i>
+              <div>
+                <div class="font-medium">New Skill</div>
+                <div class="text-xs text-gray-400">Create from scratch</div>
+              </div>
+            </button>
+            <button onclick="openFolderBrowser()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
+              <i data-lucide="folder-input" class="w-5 h-5 text-blue-400"></i>
+              <div>
+                <div class="font-medium">Import Folder</div>
+                <div class="text-xs text-gray-400">From local directory</div>
+              </div>
+            </button>
+            <button onclick="openFileImport()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
+              <i data-lucide="files" class="w-5 h-5 text-green-400"></i>
+              <div>
+                <div class="font-medium">Import Files</div>
+                <div class="text-xs text-gray-400">Upload multiple files</div>
+              </div>
+            </button>
+            <button onclick="openGenerateModal()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
+              <i data-lucide="sparkles" class="w-5 h-5 text-orange-400"></i>
+              <div>
+                <div class="font-medium">Generate with AI</div>
+                <div class="text-xs text-gray-400">Claude creates skill</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+        <div class="text-3xl font-bold text-purple-400" id="totalSkills">0</div>
+        <div class="text-gray-400 text-sm">Total Skills</div>
+      </div>
+      <div class="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+        <div class="text-3xl font-bold text-blue-400" id="devSkills">0</div>
+        <div class="text-gray-400 text-sm">Development</div>
+      </div>
+      <div class="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+        <div class="text-3xl font-bold text-green-400" id="docSkills">0</div>
+        <div class="text-gray-400 text-sm">Documentation</div>
+      </div>
+      <div class="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+        <div class="text-3xl font-bold text-orange-400" id="otherSkills">0</div>
+        <div class="text-gray-400 text-sm">Other</div>
+      </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="flex flex-col md:flex-row gap-4 mb-6">
+      <div class="flex-1 relative">
+        <i data-lucide="search" class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+        <input type="text" id="searchInput" placeholder="Search skills..." 
+          class="w-full bg-gray-800/50 border border-gray-700 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-purple-500"
+          oninput="filterSkills()">
+      </div>
+      <select id="categoryFilter" class="bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 min-w-[160px]" onchange="filterSkills()">
+        <option value="all">All Categories</option>
+        <option value="development">Development</option>
+        <option value="documentation">Documentation</option>
+        <option value="forms">Forms</option>
+        <option value="building">3D Building</option>
+        <option value="visual">Visual/Creative</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <!-- Skills Grid -->
+    <div id="skillsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="emptyState" class="hidden text-center py-20">
+      <i data-lucide="inbox" class="w-20 h-20 mx-auto text-gray-700 mb-4"></i>
+      <h3 class="text-xl text-gray-400 mb-2">No skills found</h3>
+      <p class="text-gray-500">Import a skill folder or create one with Claude</p>
+    </div>
+    <div id="offlineNotice" class="hidden bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-6">
+      <p class="text-yellow-300 font-medium">API Server Not Running</p>
+      <p class="text-yellow-400/70 text-sm">Start: <code class="bg-gray-800 px-2 py-0.5 rounded">python skills_manager_api.py</code></p>
+    </div>
+  </div>
+
+  <!-- Import/Create Modal -->
+  <div id="importModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col border border-gray-700">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center">
+            <i data-lucide="file-plus" class="w-5 h-5 text-purple-400"></i>
+          </div>
+          <div>
+            <h2 id="modalTitle" class="text-xl font-bold">Create Skill</h2>
+            <p class="text-gray-400 text-sm">Add a new skill to your MCP server</p>
+          </div>
+        </div>
+        <button onclick="closeImportModal()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Skill Name *</label>
+          <input type="text" id="skillName" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500" placeholder="my-skill-name" oninput="validateSkillName(this)">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Description *</label>
+          <textarea id="skillDescription" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500" placeholder="When to use this skill..."></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Category</label>
+            <select id="skillCategory" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3">
+              <option value="development">Development</option>
+              <option value="documentation">Documentation</option>
+              <option value="forms">Forms</option>
+              <option value="building">3D Building</option>
+              <option value="visual">Visual/Creative</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Tags</label>
+            <input type="text" id="skillTags" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3" placeholder="react, typescript">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">SKILL.md Content *</label>
+          <textarea id="skillContent" rows="12" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 font-mono text-sm focus:outline-none focus:border-purple-500"></textarea>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 p-6 border-t border-gray-700">
+        <button onclick="closeImportModal()" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl">Cancel</button>
+        <button onclick="importSkill()" id="importBtn" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl flex items-center gap-2 font-medium">
+          <i data-lucide="save" class="w-4 h-4"></i> Save Skill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Browser Modal -->
+  <div id="folderModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col border border-blue-500/30">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700 bg-gradient-to-r from-blue-900/20 to-transparent">
+        <div class="flex items-center gap-3">
+          <i data-lucide="folder-input" class="w-6 h-6 text-blue-400"></i>
+          <div>
+            <h2 class="text-xl font-bold">Import Folder</h2>
+            <p class="text-gray-400 text-sm">Browse and select a skill folder</p>
+          </div>
+        </div>
+        <button onclick="closeFolderBrowser()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <!-- Path Input -->
+      <div class="p-4 border-b border-gray-700 bg-gray-900/50">
+        <div class="flex gap-2">
+          <input type="text" id="folderPath" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 font-mono text-sm" placeholder="C:\path\to\skill-folder">
+          <button onclick="navigateToPath()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm">Go</button>
+        </div>
+        <div id="breadcrumbs" class="flex items-center gap-1 mt-2 text-sm overflow-x-auto"></div>
+      </div>
+      
+      <!-- File List -->
+      <div id="folderContents" class="flex-1 overflow-y-auto p-2 min-h-[300px]">
+        <div class="text-gray-500 text-center py-8">Loading...</div>
+      </div>
+      
+      <!-- Selected Folder Info -->
+      <div id="selectedFolder" class="hidden p-4 border-t border-gray-700 bg-green-900/20">
+        <div class="flex items-center gap-3">
+          <i data-lucide="folder-check" class="w-5 h-5 text-green-400"></i>
+          <div class="flex-1">
+            <div class="font-medium text-green-300" id="selectedFolderName">folder-name</div>
+            <div class="text-xs text-green-400/70" id="selectedFolderPath">/path/to/folder</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center gap-3 p-6 border-t border-gray-700">
+        <p class="text-gray-500 text-sm" id="folderStatus"></p>
+        <div class="flex gap-3">
+          <button onclick="closeFolderBrowser()" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl">Cancel</button>
+          <button onclick="importSelectedFolder()" id="importFolderBtn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center gap-2 font-medium disabled:opacity-50" disabled>
+            <i data-lucide="folder-input" class="w-4 h-4"></i> Import Folder
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Upload Modal -->
+  <div id="fileModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col border border-green-500/30">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700 bg-gradient-to-r from-green-900/20 to-transparent">
+        <div class="flex items-center gap-3">
+          <i data-lucide="files" class="w-6 h-6 text-green-400"></i>
+          <div>
+            <h2 class="text-xl font-bold">Import Files</h2>
+            <p class="text-gray-400 text-sm">Upload skill files (SKILL.md, scripts, etc.)</p>
+          </div>
+        </div>
+        <button onclick="closeFileImport()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Skill Name *</label>
+          <input type="text" id="fileSkillName" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3" placeholder="my-skill-name" oninput="validateSkillName(this)">
+        </div>
+        
+        <!-- Drop Zone -->
+        <div id="dropZone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-green-500 transition cursor-pointer" onclick="document.getElementById('multiFileInput').click()">
+          <input type="file" id="multiFileInput" multiple webkitdirectory class="hidden" onchange="handleMultiFileSelect(event)">
+          <i data-lucide="upload-cloud" class="w-12 h-12 mx-auto text-gray-500 mb-3"></i>
+          <p class="text-gray-300 font-medium">Drop files or folder here</p>
+          <p class="text-gray-500 text-sm mt-1">Or click to browse</p>
+        </div>
+        
+        <!-- File List -->
+        <div id="fileList" class="hidden max-h-48 overflow-y-auto bg-gray-900 rounded-xl border border-gray-700">
+          <div class="p-3 border-b border-gray-700 flex justify-between items-center">
+            <span class="text-sm font-medium" id="fileCount">0 files selected</span>
+            <button onclick="clearFiles()" class="text-xs text-red-400 hover:text-red-300">Clear all</button>
+          </div>
+          <div id="fileListItems" class="divide-y divide-gray-800"></div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3 p-6 border-t border-gray-700">
+        <button onclick="closeFileImport()" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl">Cancel</button>
+        <button onclick="uploadFiles()" id="uploadFilesBtn" class="px-5 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl flex items-center gap-2 font-medium disabled:opacity-50" disabled>
+          <i data-lucide="upload" class="w-4 h-4"></i> Upload Files
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate Modal -->
+  <div id="generateModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col border border-orange-500/30 claude-glow">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700 bg-gradient-to-r from-orange-900/20 to-transparent">
+        <div class="flex items-center gap-3">
+          <i data-lucide="sparkles" class="w-6 h-6 text-orange-400"></i>
+          <div>
+            <h2 class="text-xl font-bold text-orange-100">Generate with Claude</h2>
+            <p class="text-orange-400/70 text-sm">Describe your skill idea</p>
+          </div>
+        </div>
+        <button onclick="closeGenerateModal()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-5">
+        <textarea id="skillIdea" rows="4" class="w-full bg-gray-900 border border-orange-500/30 rounded-xl px-4 py-3 focus:outline-none focus:border-orange-500" placeholder="Example: A skill for creating REST API documentation..."></textarea>
+        <div id="generatePreview" class="hidden">
+          <label class="block text-sm font-medium text-gray-300 mb-2">Generated Preview</label>
+          <pre id="generatedContent" class="bg-gray-900 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 max-h-64 overflow-auto font-mono"></pre>
+        </div>
+        <div id="generateLoading" class="hidden text-center py-8">
+          <div class="inline-flex items-center gap-3 text-orange-400">
+            <svg class="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <span class="typing">Generating</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 p-6 border-t border-gray-700">
+        <button onclick="closeGenerateModal()" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl">Cancel</button>
+        <button onclick="generateSkill()" id="generateBtn" class="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 rounded-xl flex items-center gap-2 font-medium">
+          <i data-lucide="sparkles" class="w-4 h-4"></i> Generate
+        </button>
+        <button onclick="saveGeneratedSkill()" id="saveGeneratedBtn" class="hidden px-5 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl flex items-center gap-2 font-medium">
+          <i data-lucide="save" class="w-4 h-4"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claude Console Modal -->
+  <div id="claudeConsole" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-900 rounded-2xl w-full max-w-4xl mx-4 max-h-[85vh] overflow-hidden flex flex-col border border-orange-500/30">
+      <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gradient-to-r from-orange-900/30 to-transparent">
+        <div class="flex items-center gap-3">
+          <i data-lucide="terminal" class="w-5 h-5 text-orange-400"></i>
+          <span class="font-bold text-orange-100">Claude Console</span>
+        </div>
+        <button onclick="closeClaudeConsole()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-hidden flex flex-col">
+        <div id="consoleOutput" class="flex-1 overflow-y-auto p-4 font-mono text-sm bg-black/50 space-y-2">
+          <div class="text-orange-400">Claude Code Console</div>
+          <div class="text-gray-500">Select a skill and enter a prompt...</div>
+        </div>
+        <div class="p-4 border-t border-gray-700 bg-gray-800/50">
+          <div class="flex items-center gap-2 mb-3">
+            <select id="consoleSkillSelect" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1">
+              <option value="">No skill context</option>
+            </select>
+            <button onclick="runConsoleCommand()" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm flex items-center gap-2">
+              <i data-lucide="play" class="w-4 h-4"></i> Run
+            </button>
+          </div>
+          <textarea id="consoleInput" rows="2" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 font-mono text-sm focus:outline-none focus:border-orange-500 resize-none" placeholder="Enter prompt... (Ctrl+Enter to run)"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Modal -->
+  <div id="viewModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col border border-gray-700">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700">
+        <h2 id="viewModalTitle" class="text-xl font-bold flex items-center gap-2"></h2>
+        <button onclick="closeViewModal()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1">
+        <pre id="viewModalContent" class="bg-gray-900 p-5 rounded-xl text-sm text-gray-300 overflow-x-auto border border-gray-700"></pre>
+      </div>
+      <div class="flex justify-between p-6 border-t border-gray-700">
+        <div class="flex gap-2">
+          <button onclick="copySkillContent()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm flex items-center gap-2">
+            <i data-lucide="copy" class="w-4 h-4"></i> Copy
+          </button>
+          <button onclick="editCurrentSkill()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm flex items-center gap-2">
+            <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
+          </button>
+        </div>
+        <button onclick="closeViewModal()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl hidden items-center gap-3 transition-all transform translate-y-2 opacity-0">
+    <i data-lucide="check-circle" class="w-5 h-5" id="toastIcon"></i>
+    <span id="toastMessage">Success!</span>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:5050';
+    let skills = [];
+    let isOnline = false;
+    let claudeAvailable = false;
+    let editingSkill = null;
+    let currentViewSkill = null;
+    let generatedSkillData = null;
+    let selectedFolderPath = null;
+    let selectedFiles = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      checkConnection();
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#importDropdown')) {
+          document.getElementById('importMenu').classList.add('hidden');
+        }
+      });
+    });
+
+    function toggleImportMenu() {
+      document.getElementById('importMenu').classList.toggle('hidden');
+    }
+
+    async function checkConnection() {
+      try {
+        const res = await fetch(`${API_BASE}/api/skills`);
+        if (res.ok) {
+          isOnline = true;
+          document.getElementById('connectionStatus').innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-green-400 text-sm">Connected</span>`;
+          document.getElementById('offlineNotice').classList.add('hidden');
+          await loadSkillsFromAPI();
+          await checkClaudeStatus();
+        }
+      } catch (e) {
+        isOnline = false;
+        document.getElementById('connectionStatus').innerHTML = `<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-red-400 text-sm">Offline</span>`;
+        document.getElementById('offlineNotice').classList.remove('hidden');
+        loadSkillsFromStorage();
+      }
+      renderSkills();
+    }
+
+    async function checkClaudeStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/api/claude/status`);
+        const data = await res.json();
+        if (data.available) {
+          claudeAvailable = true;
+          document.getElementById('claudeStatus').innerHTML = `<span class="w-2 h-2 bg-orange-500 rounded-full"></span><span class="text-orange-400 text-sm">Claude Ready</span>`;
+          document.getElementById('claudeBtn').disabled = false;
+        }
+      } catch (e) {}
+    }
+
+    async function loadSkillsFromAPI() {
+      try {
+        const res = await fetch(`${API_BASE}/api/skills`);
+        const data = await res.json();
+        skills = data.skills.map(s => ({ ...s, category: inferCategory(s), tags: s.tags || [] }));
+        saveSkillsToStorage();
+        updateConsoleSkillSelect();
+      } catch (e) { loadSkillsFromStorage(); }
+    }
+
+    function inferCategory(skill) {
+      const combined = `${skill.name} ${skill.description || ''} ${(skill.tags || []).join(' ')}`.toLowerCase();
+      if (combined.includes('form') || combined.includes('validation')) return 'forms';
+      if (combined.includes('build') || combined.includes('three') || combined.includes('physics')) return 'building';
+      if (combined.includes('docx') || combined.includes('pptx') || combined.includes('xlsx') || combined.includes('pdf')) return 'documentation';
+      if (combined.includes('visual') || combined.includes('art') || combined.includes('design') || combined.includes('d3')) return 'visual';
+      if (combined.includes('react') || combined.includes('node') || combined.includes('tdd') || combined.includes('debug') || combined.includes('aws')) return 'development';
+      return 'other';
+    }
+
+    function loadSkillsFromStorage() { const s = localStorage.getItem('mcp-skills-cache'); if (s) skills = JSON.parse(s); }
+    function saveSkillsToStorage() { localStorage.setItem('mcp-skills-cache', JSON.stringify(skills)); }
+    function updateConsoleSkillSelect() {
+      document.getElementById('consoleSkillSelect').innerHTML = '<option value="">No skill context</option>' + skills.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    }
+
+    function renderSkills() {
+      const grid = document.getElementById('skillsGrid');
+      const empty = document.getElementById('emptyState');
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const cat = document.getElementById('categoryFilter').value;
+
+      const filtered = skills.filter(s => {
+        const match = s.name.includes(search) || (s.description || '').toLowerCase().includes(search);
+        return match && (cat === 'all' || s.category === cat);
+      });
+
+      if (filtered.length === 0) { grid.classList.add('hidden'); empty.classList.remove('hidden'); }
+      else {
+        grid.classList.remove('hidden'); empty.classList.add('hidden');
+        grid.innerHTML = filtered.map(s => `
+          <div class="skill-card bg-gray-800/70 rounded-xl p-5 border border-gray-700/50 hover:border-purple-500/50 transition-all cursor-pointer" onclick="viewSkill('${s.name}')">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="font-semibold text-white">${s.name}</h3>
+              <span class="text-xs px-2 py-1 rounded-lg ${getCategoryColor(s.category)}">${s.category}</span>
+            </div>
+            <p class="text-gray-400 text-sm mb-3 line-clamp-2">${s.description || 'No description'}</p>
+            <div class="flex gap-2 text-xs text-gray-500">
+              ${s.has_scripts ? '<span class="bg-gray-700 px-2 py-0.5 rounded">scripts/</span>' : ''}
+              ${s.has_references ? '<span class="bg-gray-700 px-2 py-0.5 rounded">refs/</span>' : ''}
+              ${s.file_count ? `<span>${s.file_count} files</span>` : ''}
+            </div>
+            <div class="flex gap-3 pt-3 mt-3 border-t border-gray-700/50">
+              <button onclick="event.stopPropagation(); editSkill('${s.name}')" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i> Edit
+              </button>
+              <button onclick="event.stopPropagation(); deleteSkill('${s.name}')" class="text-sm text-red-400 hover:text-red-300 flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="event.stopPropagation(); exportSkill('${s.name}')" class="text-sm text-green-400 hover:text-green-300 flex items-center gap-1 ml-auto">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+      updateStats();
+      lucide.createIcons();
+    }
+
+    function getCategoryColor(c) {
+      const colors = { development: 'bg-blue-500/20 text-blue-300', documentation: 'bg-green-500/20 text-green-300', forms: 'bg-yellow-500/20 text-yellow-300', building: 'bg-purple-500/20 text-purple-300', visual: 'bg-pink-500/20 text-pink-300', other: 'bg-gray-500/20 text-gray-300' };
+      return colors[c] || colors.other;
+    }
+
+    function updateStats() {
+      document.getElementById('totalSkills').textContent = skills.length;
+      document.getElementById('devSkills').textContent = skills.filter(s => s.category === 'development').length;
+      document.getElementById('docSkills').textContent = skills.filter(s => s.category === 'documentation').length;
+      document.getElementById('otherSkills').textContent = skills.filter(s => !['development', 'documentation'].includes(s.category)).length;
+    }
+
+    function filterSkills() { renderSkills(); }
+    async function refreshSkills() { await checkConnection(); showToast('Refreshed!'); }
+    function validateSkillName(input) { input.value = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-'); }
+
+    // === Create/Edit Modal ===
+    function openImportModal() {
+      toggleImportMenu();
+      editingSkill = null;
+      document.getElementById('modalTitle').textContent = 'Create Skill';
+      document.getElementById('skillName').value = '';
+      document.getElementById('skillDescription').value = '';
+      document.getElementById('skillContent').value = `# Skill Name\n\n## Overview\nDescribe what this skill does.\n\n## When to Use\n- Condition 1\n- Condition 2\n\n## Quick Start\n\`\`\`javascript\n// Example\n\`\`\``;
+      document.getElementById('importModal').classList.remove('hidden');
+      document.getElementById('importModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); document.getElementById('importModal').classList.remove('flex'); }
+
+    async function importSkill() {
+      const name = document.getElementById('skillName').value.trim();
+      const description = document.getElementById('skillDescription').value.trim();
+      const tags = document.getElementById('skillTags').value.split(',').map(t => t.trim()).filter(t => t);
+      const content = document.getElementById('skillContent').value;
+      if (!name || !description || !content) { showToast('Fill all fields', 'error'); return; }
+
+      try {
+        const endpoint = editingSkill ? `${API_BASE}/api/skills/${editingSkill}` : `${API_BASE}/api/skills`;
+        const res = await fetch(endpoint, {
+          method: editingSkill ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description, tags, content })
+        });
+        if (res.ok) {
+          await loadSkillsFromAPI();
+          renderSkills();
+          closeImportModal();
+          showToast(editingSkill ? 'Updated!' : 'Created!');
+        } else {
+          const data = await res.json();
+          showToast(data.error || 'Failed', 'error');
+        }
+      } catch (e) { showToast('Error', 'error'); }
+    }
+
+    function editSkill(name) {
+      const skill = skills.find(s => s.name === name);
+      if (!skill) return;
+      editingSkill = name;
+      document.getElementById('modalTitle').textContent = 'Edit Skill';
+      document.getElementById('skillName').value = skill.name;
+      document.getElementById('skillDescription').value = skill.description || '';
+      document.getElementById('skillTags').value = (skill.tags || []).join(', ');
+      let content = skill.content || '';
+      if (content.startsWith('---')) { const idx = content.indexOf('---', 3); if (idx > 0) content = content.substring(idx + 3).trim(); }
+      document.getElementById('skillContent').value = content;
+      document.getElementById('importModal').classList.remove('hidden');
+      document.getElementById('importModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    // === Folder Browser ===
+    function openFolderBrowser() {
+      toggleImportMenu();
+      selectedFolderPath = null;
+      document.getElementById('importFolderBtn').disabled = true;
+      document.getElementById('selectedFolder').classList.add('hidden');
+      document.getElementById('folderPath').value = '';
+      document.getElementById('folderModal').classList.remove('hidden');
+      document.getElementById('folderModal').classList.add('flex');
+      browsePath('');
+      lucide.createIcons();
+    }
+
+    function closeFolderBrowser() { document.getElementById('folderModal').classList.add('hidden'); document.getElementById('folderModal').classList.remove('flex'); }
+
+    function navigateToPath() { browsePath(document.getElementById('folderPath').value); }
+
+    async function browsePath(path) {
+      const contents = document.getElementById('folderContents');
+      contents.innerHTML = '<div class="text-gray-500 text-center py-8">Loading...</div>';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/browse?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+
+        if (data.error) { contents.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`; return; }
+
+        document.getElementById('folderPath').value = data.path || '';
+        
+        // Breadcrumbs
+        const crumbs = document.getElementById('breadcrumbs');
+        if (data.path) {
+          const parts = data.path.split(/[/\\]/).filter(p => p);
+          crumbs.innerHTML = parts.map((p, i) => {
+            const fullPath = parts.slice(0, i + 1).join('/');
+            return `<button onclick="browsePath('${fullPath.replace(/'/g, "\\'")}')" class="text-blue-400 hover:text-blue-300">${p}</button><span class="text-gray-600">/</span>`;
+          }).join('');
+        } else {
+          crumbs.innerHTML = '';
+        }
+
+        let html = '';
+        
+        // Parent directory
+        if (data.parent) {
+          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="browsePath('${data.parent.replace(/'/g, "\\'")}')">
+            <i data-lucide="corner-left-up" class="w-5 h-5 text-gray-500"></i>
+            <span class="text-gray-400">..</span>
+          </div>`;
+        }
+
+        // Directories
+        for (const dir of data.dirs) {
+          const isSkill = dir.is_skill;
+          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer ${isSkill ? 'skill-folder bg-purple-900/20' : ''}" onclick="${isSkill ? `selectFolder('${dir.path.replace(/'/g, "\\'")}', '${dir.name}')` : `browsePath('${dir.path.replace(/'/g, "\\'")}')`}">
+            <i data-lucide="${isSkill ? 'folder-check' : 'folder'}" class="w-5 h-5 ${isSkill ? 'text-purple-400' : 'text-blue-400'}"></i>
+            <span class="${isSkill ? 'text-purple-300' : ''}">${dir.name}</span>
+            ${isSkill ? '<span class="ml-auto text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded">SKILL</span>' : ''}
+          </div>`;
+        }
+
+        // Files (just for display)
+        for (const file of data.files.slice(0, 20)) {
+          html += `<div class="flex items-center gap-3 px-4 py-2 text-gray-500">
+            <i data-lucide="file" class="w-4 h-4"></i>
+            <span class="text-sm">${file.name}</span>
+          </div>`;
+        }
+
+        contents.innerHTML = html || '<div class="text-gray-500 text-center py-8">Empty directory</div>';
+        lucide.createIcons();
+      } catch (e) {
+        contents.innerHTML = `<div class="text-red-400 text-center py-8">Error: ${e.message}</div>`;
+      }
+    }
+
+    function selectFolder(path, name) {
+      selectedFolderPath = path;
+      document.getElementById('selectedFolderName').textContent = name;
+      document.getElementById('selectedFolderPath').textContent = path;
+      document.getElementById('selectedFolder').classList.remove('hidden');
+      document.getElementById('importFolderBtn').disabled = false;
+    }
+
+    async function importSelectedFolder() {
+      if (!selectedFolderPath) return;
+      document.getElementById('folderStatus').textContent = 'Importing...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/import/folder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: selectedFolderPath })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          await loadSkillsFromAPI();
+          renderSkills();
+          closeFolderBrowser();
+          showToast(`Imported ${data.files_imported} files!`);
+        } else {
+          showToast(data.error || 'Import failed', 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+      document.getElementById('folderStatus').textContent = '';
+    }
+
+    // === File Upload ===
+    function openFileImport() {
+      toggleImportMenu();
+      selectedFiles = [];
+      document.getElementById('fileSkillName').value = '';
+      document.getElementById('fileList').classList.add('hidden');
+      document.getElementById('uploadFilesBtn').disabled = true;
+      document.getElementById('fileModal').classList.remove('hidden');
+      document.getElementById('fileModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeFileImport() { document.getElementById('fileModal').classList.add('hidden'); document.getElementById('fileModal').classList.remove('flex'); }
+
+    function handleMultiFileSelect(event) {
+      const files = Array.from(event.target.files);
+      selectedFiles = files;
+      
+      if (files.length > 0) {
+        // Try to infer skill name from folder structure
+        const firstPath = files[0].webkitRelativePath || files[0].name;
+        const parts = firstPath.split('/');
+        if (parts.length > 1 && !document.getElementById('fileSkillName').value) {
+          document.getElementById('fileSkillName').value = parts[0].toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        }
+
+        document.getElementById('fileCount').textContent = `${files.length} files selected`;
+        document.getElementById('fileListItems').innerHTML = files.slice(0, 20).map(f => `
+          <div class="px-4 py-2 flex items-center gap-2 text-sm">
+            <i data-lucide="file" class="w-4 h-4 text-gray-500"></i>
+            <span class="text-gray-300 truncate">${f.webkitRelativePath || f.name}</span>
+            <span class="text-gray-600 ml-auto">${(f.size / 1024).toFixed(1)}KB</span>
+          </div>
+        `).join('') + (files.length > 20 ? `<div class="px-4 py-2 text-gray-500 text-sm">...and ${files.length - 20} more</div>` : '');
+        
+        document.getElementById('fileList').classList.remove('hidden');
+        document.getElementById('uploadFilesBtn').disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    function clearFiles() {
+      selectedFiles = [];
+      document.getElementById('fileList').classList.add('hidden');
+      document.getElementById('uploadFilesBtn').disabled = true;
+      document.getElementById('multiFileInput').value = '';
+    }
+
+    async function uploadFiles() {
+      const skillName = document.getElementById('fileSkillName').value.trim();
+      if (!skillName) { showToast('Enter skill name', 'error'); return; }
+      if (selectedFiles.length === 0) { showToast('Select files', 'error'); return; }
+
+      // Read files and send as JSON
+      const filesData = [];
+      for (const file of selectedFiles) {
+        const content = await file.text();
+        const path = file.webkitRelativePath ? file.webkitRelativePath.split('/').slice(1).join('/') : file.name;
+        filesData.push({ path, content, base64: false });
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/import/json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skill_name: skillName, files: filesData })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          await loadSkillsFromAPI();
+          renderSkills();
+          closeFileImport();
+          showToast(`Uploaded ${data.files_imported.length} files!`);
+        } else {
+          showToast(data.error || 'Upload failed', 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+
+    // === Generate Modal ===
+    function openGenerateModal() {
+      toggleImportMenu();
+      if (!claudeAvailable) { showToast('Claude CLI not available', 'error'); return; }
+      document.getElementById('skillIdea').value = '';
+      document.getElementById('generatePreview').classList.add('hidden');
+      document.getElementById('generateLoading').classList.add('hidden');
+      document.getElementById('generateBtn').classList.remove('hidden');
+      document.getElementById('saveGeneratedBtn').classList.add('hidden');
+      generatedSkillData = null;
+      document.getElementById('generateModal').classList.remove('hidden');
+      document.getElementById('generateModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeGenerateModal() { document.getElementById('generateModal').classList.add('hidden'); document.getElementById('generateModal').classList.remove('flex'); }
+
+    async function generateSkill() {
+      const idea = document.getElementById('skillIdea').value.trim();
+      if (!idea) { showToast('Enter an idea', 'error'); return; }
+
+      document.getElementById('generateLoading').classList.remove('hidden');
+      document.getElementById('generateBtn').classList.add('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/claude/generate-skill`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea })
+        });
+        const data = await res.json();
+
+        if (data.success && data.skill) {
+          generatedSkillData = data.skill;
+          document.getElementById('generatedContent').textContent = data.skill.content;
+          document.getElementById('generatePreview').classList.remove('hidden');
+          document.getElementById('saveGeneratedBtn').classList.remove('hidden');
+          showToast('Generated!');
+        } else {
+          showToast(data.error || 'Failed', 'error');
+          document.getElementById('generateBtn').classList.remove('hidden');
+        }
+      } catch (e) {
+        showToast('Error', 'error');
+        document.getElementById('generateBtn').classList.remove('hidden');
+      }
+      document.getElementById('generateLoading').classList.add('hidden');
+      lucide.createIcons();
+    }
+
+    async function saveGeneratedSkill() {
+      if (!generatedSkillData) return;
+      const name = generatedSkillData.name || 'generated-' + Date.now();
+      const description = generatedSkillData.description || 'Generated skill';
+      let content = generatedSkillData.content || '';
+      if (content.startsWith('---')) { const idx = content.indexOf('---', 3); if (idx > 0) content = content.substring(idx + 3).trim(); }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/skills`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description, tags: [], content })
+        });
+        if (res.ok) {
+          await loadSkillsFromAPI();
+          renderSkills();
+          closeGenerateModal();
+          showToast('Saved!');
+        }
+      } catch (e) { showToast('Error', 'error'); }
+    }
+
+    // === View/Console ===
+    function viewSkill(name) {
+      const skill = skills.find(s => s.name === name);
+      if (!skill) return;
+      currentViewSkill = name;
+      document.getElementById('viewModalTitle').innerHTML = `<i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i><span>${skill.name}</span>`;
+      document.getElementById('viewModalContent').textContent = skill.content || `# ${skill.name}\n\n${skill.description}`;
+      document.getElementById('viewModal').classList.remove('hidden');
+      document.getElementById('viewModal').classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeViewModal() { document.getElementById('viewModal').classList.add('hidden'); document.getElementById('viewModal').classList.remove('flex'); currentViewSkill = null; }
+    function copySkillContent() { navigator.clipboard.writeText(document.getElementById('viewModalContent').textContent); showToast('Copied!'); }
+    function editCurrentSkill() { if (currentViewSkill) { closeViewModal(); editSkill(currentViewSkill); } }
+
+    function openClaudeConsole() {
+      document.getElementById('claudeConsole').classList.remove('hidden');
+      document.getElementById('claudeConsole').classList.add('flex');
+      lucide.createIcons();
+    }
+    function closeClaudeConsole() { document.getElementById('claudeConsole').classList.add('hidden'); document.getElementById('claudeConsole').classList.remove('flex'); }
+
+    async function runConsoleCommand() {
+      const input = document.getElementById('consoleInput').value.trim();
+      if (!input) return;
+      const skillName = document.getElementById('consoleSkillSelect').value;
+      const output = document.getElementById('consoleOutput');
+      output.innerHTML += `<div class="text-blue-400 mt-4">❯ ${input}</div><div class="text-gray-500">Running...</div>`;
+      output.scrollTop = output.scrollHeight;
+
+      try {
+        let skillContext = '';
+        if (skillName) { const skill = skills.find(s => s.name === skillName); if (skill) skillContext = skill.content || ''; }
+        const res = await fetch(`${API_BASE}/api/claude/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: input, skill_context: skillContext })
+        });
+        const data = await res.json();
+        output.lastChild.remove();
+        if (data.success) output.innerHTML += `<div class="text-green-300 whitespace-pre-wrap">${data.stdout || '(no output)'}</div>`;
+        else output.innerHTML += `<div class="text-red-400">${data.error}</div>`;
+      } catch (e) {
+        output.lastChild.remove();
+        output.innerHTML += `<div class="text-red-400">Error: ${e.message}</div>`;
+      }
+      document.getElementById('consoleInput').value = '';
+      output.scrollTop = output.scrollHeight;
+    }
+
+    async function deleteSkill(name) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/skills/${name}`, { method: 'DELETE' });
+        if (res.ok) { await loadSkillsFromAPI(); renderSkills(); showToast('Deleted'); }
+      } catch (e) { showToast('Error', 'error'); }
+    }
+
+    function exportSkill(name) {
+      const skill = skills.find(s => s.name === name);
+      if (!skill) return;
+      const blob = new Blob([skill.content || `# ${skill.name}`], { type: 'text/markdown' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${skill.name}-SKILL.md`; a.click();
+      showToast('Exported!');
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = `fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${type === 'error' ? 'bg-red-600' : 'bg-green-600'} text-white`;
+      document.getElementById('toastIcon').setAttribute('data-lucide', type === 'error' ? 'alert-circle' : 'check-circle');
+      document.getElementById('toastMessage').textContent = message;
+      toast.classList.remove('hidden', 'translate-y-2', 'opacity-0');
+      lucide.createIcons();
+      setTimeout(() => { toast.classList.add('translate-y-2', 'opacity-0'); setTimeout(() => toast.classList.add('hidden'), 300); }, 3000);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey && document.activeElement.id === 'consoleInput') runConsoleCommand();
+    });
+
+    // Drag and drop for file modal
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-green-500', 'bg-green-900/20'); });
+      dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-green-500', 'bg-green-900/20'); });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-green-500', 'bg-green-900/20');
+        if (e.dataTransfer.files.length) {
+          document.getElementById('multiFileInput').files = e.dataTransfer.files;
+          handleMultiFileSelect({ target: { files: e.dataTransfer.files } });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
