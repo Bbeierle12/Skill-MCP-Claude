@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Skills Manager - Manage Claude MCP Skills">
+  <meta name="theme-color" content="#9333ea">
+
+  <title>Skills Manager</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Preconnect to API -->
+  <link rel="preconnect" href="http://localhost:5050">
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  <!-- Skip Link for Accessibility -->
+  <a href="#main-content"
+     class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-purple-600 focus:text-white focus:rounded-lg">
+    Skip to main content
+  </a>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="container header-content">
+      <!-- Logo -->
+      <div class="app-logo">
+        <i data-lucide="brain" class="w-8 h-8 text-purple-500"></i>
+        <span class="text-xl font-bold">Skills Manager</span>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="flex items-center gap-3">
+        <!-- Connection Status -->
+        <div id="connection-status"
+             class="status-indicator offline"
+             role="status"
+             aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-text">Connecting...</span>
+        </div>
+
+        <!-- Claude CLI Status -->
+        <div id="claude-status"
+             class="hidden items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+             role="status">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          <span class="claude-status-text">Claude CLI</span>
+        </div>
+
+        <!-- Action Buttons -->
+        <button type="button"
+                class="btn btn-ghost btn-icon"
+                data-action="open-claude-console"
+                aria-label="Open Claude Console"
+                title="Claude Console">
+          <i data-lucide="terminal" class="w-5 h-5"></i>
+        </button>
+
+        <button type="button"
+                class="btn btn-primary"
+                data-action="open-import-modal"
+                aria-label="Create or import a skill">
+          <i data-lucide="plus" class="w-5 h-5"></i>
+          <span class="hidden sm:inline">New Skill</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main-content" class="container py-6">
+    <!-- Skills Section (rendered by JavaScript) -->
+    <div id="skills-section">
+      <!-- Loading state shown initially -->
+      <div class="flex flex-col items-center justify-center py-16">
+        <div class="loading-spinner w-8 h-8 border-2 border-gray-600 border-t-purple-500 rounded-full"></div>
+        <p class="mt-4 text-gray-400">Loading skills...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modals Container -->
+  <div id="modals-container" aria-live="polite">
+    <!-- Modals are dynamically inserted here -->
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"
+       class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
+       role="region"
+       aria-label="Notifications"
+       aria-live="polite">
+    <!-- Toasts are dynamically inserted here -->
+  </div>
+
+  <!-- Main Application Script -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
