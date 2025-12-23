@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start API Server",
+      "type": "shell",
+      "command": "python",
+      "args": ["skills_manager_api.py"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start MCP Server",
+      "type": "shell",
+      "command": "python",
+      "args": ["server.py"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "pip",
+      "args": ["install", "-r", "requirements.txt"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Executable",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m", "PyInstaller",
+        "--onefile",
+        "--name", "SkillsManager",
+        "--console",
+        "--clean",
+        "--noconfirm",
+        "--add-data", "skills-manager.html;.",
+        "skills_manager_app.py"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Copy HTML to Dist",
+      "type": "shell",
+      "command": "Copy-Item",
+      "args": [
+        "skills-manager.html",
+        "dist/skills-manager.html",
+        "-Force"
+      ],
+      "dependsOn": ["Build Executable"],
+      "problemMatcher": []
+    }
+  ]
+}

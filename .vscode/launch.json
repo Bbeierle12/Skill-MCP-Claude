@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run API Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/skills_manager_api.py",
+      "console": "integratedTerminal",
+      "env": {
+        "FLASK_DEBUG": "1"
+      }
+    },
+    {
+      "name": "Run MCP Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run Standalone App",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/skills_manager_app.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Build Executable",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "-m",
+      "args": [
+        "PyInstaller",
+        "--onefile",
+        "--name", "SkillsManager",
+        "--console",
+        "--add-data", "skills-manager.html;.",
+        "skills_manager_app.py"
+      ],
+      "console": "integratedTerminal"
+    }
+  ]
+}

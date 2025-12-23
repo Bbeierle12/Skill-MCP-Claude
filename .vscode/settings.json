@@ -1,0 +1,34 @@
+{
+  "python.defaultInterpreterPath": "python",
+  "python.formatting.provider": "none",
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/build": true,
+    "**/*.spec": true,
+    "**/.git": true
+  },
+  "files.associations": {
+    "*.html": "html"
+  },
+  "emmet.includeLanguages": {
+    "html": "html"
+  },
+  "liveServer.settings.port": 5051,
+  "liveServer.settings.proxy": {
+    "enable": true,
+    "baseUri": "/api",
+    "proxyUri": "http://localhost:5050/api"
+  },
+  "[python]": {
+    "editor.tabSize": 4
+  },
+  "[html]": {
+    "editor.tabSize": 2
+  },
+  "[javascript]": {
+    "editor.tabSize": 2
+  }
+}

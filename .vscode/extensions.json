@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.debugpy",
+    "bradlc.vscode-tailwindcss",
+    "ritwickdey.liveserver",
+    "esbenp.prettier-vscode",
+    "formulahendry.auto-rename-tag"
+  ]
+}
