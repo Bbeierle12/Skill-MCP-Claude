@@ -259,72 +259,18 @@ function renderUploadPanel() {
  * @returns {string}
  */
 function renderAIPanel() {
-  const claudeAvailable = AppState.getState().claudeAvailable;
-
-  if (!claudeAvailable) {
-    return `
-      <div id="import-panel-ai" class="import-panel" role="tabpanel">
-        <div class="flex flex-col items-center justify-center py-8 text-center">
-          <i data-lucide="alert-circle" class="w-12 h-12 text-yellow-500 mb-4"></i>
-          <h3 class="text-lg font-medium text-white mb-2">Claude CLI Not Available</h3>
-          <p class="text-gray-400 mb-4">AI generation requires the Claude Code CLI to be installed and accessible.</p>
-          <a href="https://claude.ai/claude-code"
-             target="_blank"
-             rel="noopener noreferrer"
-             class="text-purple-400 hover:text-purple-300 underline">
-            Learn how to install Claude Code CLI
-          </a>
-        </div>
-      </div>
-    `;
-  }
-
   return `
     <div id="import-panel-ai" class="import-panel" role="tabpanel">
-      <div class="space-y-4">
-        <div class="form-group">
-          <label for="ai-idea" class="block text-sm font-medium text-gray-300 mb-2">
-            Describe Your Skill Idea
-          </label>
-          <textarea id="ai-idea"
-                    rows="4"
-                    class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-colors resize-y"
-                    placeholder="A skill that helps with React form validation using Zod schema..."></textarea>
-          <p class="mt-1 text-xs text-gray-500">Be as specific as possible about what the skill should do</p>
-        </div>
-
-        <div id="ai-result" class="hidden space-y-4">
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-300 mb-2">Generated Skill Preview</label>
-            <div id="ai-preview" class="bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
-              <!-- Generated content will appear here -->
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="ai-skill-name" class="block text-sm font-medium text-gray-300 mb-2">
-              Skill Name
-            </label>
-            <input type="text"
-                   id="ai-skill-name"
-                   class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-colors"
-                   placeholder="auto-generated-name">
-          </div>
-        </div>
-
-        <button type="button"
-                id="generate-ai-btn"
-                class="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-action="generate-skill">
-          <i data-lucide="sparkles" class="w-4 h-4"></i>
-          Generate Skill
-        </button>
-
-        <div id="ai-errors" class="hidden p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-sm text-red-300"></div>
+      <div class="flex flex-col items-center justify-center py-8 text-center">
+        <i data-lucide="sparkles" class="w-12 h-12 text-purple-500 mb-4"></i>
+        <h3 class="text-lg font-medium text-white mb-2">AI Skill Generation</h3>
+        <p class="text-gray-400 mb-4">Use Claude Code CLI directly to generate skills with AI.</p>
+        <code class="text-sm text-purple-400 bg-gray-800 px-4 py-2 rounded-lg">claude "create a skill for..."</code>
       </div>
     </div>
   `;
 }
+
 
 /**
  * Render modal content based on current mode
@@ -636,7 +582,7 @@ async function generateSkill() {
   generateBtn.innerHTML = '<div class="loading-spinner w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating...';
 
   try {
-    const result = await API.claude.generate(idea);
+    // AI generation removed - use Claude Code CLI directly
 
     // Show result
     const resultEl = document.getElementById('ai-result');

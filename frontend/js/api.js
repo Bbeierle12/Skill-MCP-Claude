@@ -46,8 +46,6 @@ export class APIError extends Error {
         return 'Permission denied. Check file system permissions.';
       case 'VALIDATION_ERROR':
         return this.message || 'Invalid input. Please check your data.';
-      case 'CLAUDE_NOT_FOUND':
-        return 'Claude Code CLI not found. Install it or check your PATH.';
       default:
         return this.message || 'An unexpected error occurred.';
     }
@@ -67,7 +65,7 @@ function delay(ms) {
  * API Service
  */
 export const API = {
-  baseUrl: 'http://localhost:5050',
+  baseUrl: ''  // Use relative URLs for Vercel,
 
   // Request configuration
   config: {
@@ -327,61 +325,6 @@ export const API = {
     async list(path = '') {
       const params = path ? `?path=${encodeURIComponent(path)}` : '';
       return API.request(`/api/browse${params}`);
-    },
-  },
-
-  // ============================================
-  // Claude CLI Operations
-  // ============================================
-
-  claude: {
-    /**
-     * Check Claude CLI status
-     * @returns {Promise<{available: boolean, path?: string, version?: string, error?: string}>}
-     */
-    async status() {
-      return API.request('/api/claude/status', { retries: 0 });
-    },
-
-    /**
-     * Run a Claude CLI command
-     * @param {string} prompt - The prompt to send
-     * @param {string} skillContext - Optional skill context
-     * @returns {Promise<{success: boolean, stdout: string, stderr: string, returncode: number}>}
-     */
-    async run(prompt, skillContext = '') {
-      return API.request('/api/claude/run', {
-        method: 'POST',
-        body: { prompt, skill_context: skillContext },
-        timeout: 120000, // 2 minute timeout for Claude
-      });
-    },
-
-    /**
-     * Generate a new skill using Claude
-     * @param {string} idea - Skill idea description
-     * @returns {Promise<{success: boolean, skill: Object}>}
-     */
-    async generate(idea) {
-      return API.request('/api/claude/generate-skill', {
-        method: 'POST',
-        body: { idea },
-        timeout: 180000, // 3 minute timeout
-      });
-    },
-
-    /**
-     * Improve an existing skill using Claude
-     * @param {string} skillName - Skill to improve
-     * @param {string} request - Improvement request
-     * @returns {Promise<{success: boolean, improved_content: string, original_content: string}>}
-     */
-    async improve(skillName, request) {
-      return API.request('/api/claude/improve-skill', {
-        method: 'POST',
-        body: { skill_name: skillName, request },
-        timeout: 180000, // 3 minute timeout
-      });
     },
   },
 

@@ -12,7 +12,6 @@ import { SkillsSection, updateGrid, updateFilters, updateStats } from './compone
 import { openViewModal, initViewModalHandlers } from './modals/viewModal.js';
 import { openEditModal, initEditModalHandlers } from './modals/editModal.js';
 import { openImportModal, initImportModalHandlers } from './modals/importModal.js';
-import { openClaudeConsole, initClaudeConsoleHandlers } from './modals/claudeConsole.js';
 
 // ============================================
 // Connection Management
@@ -43,28 +42,6 @@ function updateConnectionStatus(isOnline) {
 }
 
 /**
- * Update Claude CLI status UI
- * @param {boolean} available
- * @param {string} version
- */
-function updateClaudeStatus(available, version = '') {
-  const statusEl = document.getElementById('claude-status');
-  if (!statusEl) return;
-
-  const textEl = statusEl.querySelector('.claude-status-text');
-
-  if (available) {
-    statusEl.classList.remove('hidden');
-    statusEl.classList.add('flex', 'bg-green-500/20', 'text-green-300');
-    textEl.textContent = version ? `Claude ${version}` : 'Claude CLI';
-  } else {
-    statusEl.classList.remove('hidden');
-    statusEl.classList.add('flex', 'bg-yellow-500/20', 'text-yellow-300');
-    textEl.textContent = 'No CLI';
-  }
-}
-
-/**
  * Check connection to API server
  */
 async function checkConnection() {
@@ -72,19 +49,6 @@ async function checkConnection() {
     const isOnline = await API.checkConnection();
     AppState.update('isOnline', isOnline);
     updateConnectionStatus(isOnline);
-
-    if (isOnline) {
-      // Check Claude CLI status
-      try {
-        const claudeStatus = await API.claude.status();
-        AppState.update('claudeAvailable', claudeStatus.available);
-        updateClaudeStatus(claudeStatus.available, claudeStatus.version);
-      } catch {
-        AppState.update('claudeAvailable', false);
-        updateClaudeStatus(false);
-      }
-    }
-
     return isOnline;
   } catch {
     AppState.update('isOnline', false);
@@ -347,11 +311,6 @@ function setupEventDelegation() {
         return;
       }
 
-      // Open Claude console
-      if (action === 'open-claude-console') {
-        openClaudeConsole();
-        return;
-      }
     }
   });
 }
@@ -406,7 +365,6 @@ async function init() {
   initViewModalHandlers();
   initEditModalHandlers();
   initImportModalHandlers();
-  initClaudeConsoleHandlers();
   setupEventDelegation();
   setupStateSubscriptions();
 

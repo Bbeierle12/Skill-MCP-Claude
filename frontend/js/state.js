@@ -287,7 +287,6 @@ const initialState = {
 
   // Connection status
   isOnline: false,
-  claudeAvailable: false,
 
   // UI state
   ui: {
