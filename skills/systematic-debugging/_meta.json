@@ -1,0 +1,7 @@
+{
+  "name": "systematic-debugging",
+  "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes. Implements scientific method for debugging with root cause analysis.",
+  "tags": [],
+  "sub_skills": [],
+  "source": "claude-user"
+}

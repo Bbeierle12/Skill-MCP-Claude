@@ -1,0 +1,7 @@
+{
+  "name": "writing-plans",
+  "description": "Use after brainstorming/design phase to create detailed implementation plans. Creates step-by-step plans clear enough for execution by any developer.",
+  "tags": [],
+  "sub_skills": [],
+  "source": "claude-user"
+}

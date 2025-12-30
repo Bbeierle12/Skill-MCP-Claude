@@ -1,0 +1,7 @@
+{
+  "name": "software-architecture",
+  "description": "Implements design patterns including Clean Architecture, SOLID principles, and comprehensive software design best practices. Use when designing systems, reviewing architecture, establishing patterns, or making structural decisions.",
+  "tags": [],
+  "sub_skills": [],
+  "source": "claude-user"
+}
