@@ -287,6 +287,7 @@ def mock_subprocess():
 def server_module(temp_skills_dir):
     """Import and configure the server module with test directory."""
     import server
+    from collections import deque
 
     # Save original values
     original_skills_dir = server.SKILLS_DIR
@@ -303,7 +304,7 @@ def server_module(temp_skills_dir):
     server._USAGE_STATS = {
         "tool_calls": {},
         "skill_loads": {},
-        "searches": [],
+        "searches": deque(maxlen=100),  # Use deque with maxlen like production
         "start_time": "2024-01-01T00:00:00"
     }
 
