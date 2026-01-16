@@ -56,7 +56,7 @@ def is_safe_skill_name(name: str) -> bool:
     if not name or not isinstance(name, str):
         return False
     # Only allow alphanumeric, hyphens, and underscores
-    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', name)) and '..' not in name
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', name))
 
 
 def validate_skill_path(skill_path: Path) -> bool:
@@ -511,17 +511,16 @@ def _search_content(query: str, limit: int = 10) -> dict:
                     score = 1.2
 
             # All words present (medium priority)
-            elif len(query_words) > 0 and all(word in content for word in query_words):
+            elif all(word in content for word in query_words):
                 score = 0.7
                 matches = sum(content.count(word) for word in query_words)
                 score += min(matches * 0.05, 0.2)  # Bonus for frequency, capped
 
             # Some words present (lower priority)
             else:
-                if len(query_words) > 0:
-                    matches = sum(1 for word in query_words if word in content)
-                    if matches > 0:
-                        score = 0.3 * (matches / len(query_words))
+                matches = sum(1 for word in query_words if word in content)
+                if matches > 0:
+                    score = 0.3 * (matches / len(query_words))
 
             if score > 0:
                 # Extract snippet around match
@@ -586,14 +585,18 @@ def _reload_index() -> dict:
 
 def _get_stats() -> dict:
     """Get usage statistics."""
+    # Acquire locks in consistent order to avoid deadlock
     with _STATS_LOCK:
         stats_copy = {
             "uptime_since": _USAGE_STATS["start_time"],
             "tool_calls": _USAGE_STATS["tool_calls"].copy(),
             "skill_loads": _USAGE_STATS["skill_loads"].copy(),
             "recent_searches": list(_USAGE_STATS["searches"])[-10:],  # Last 10 searches
-            "total_skills": len(get_index()["skills"]),
         }
+    
+    # Get index info without holding stats lock
+    index = get_index()
+    stats_copy["total_skills"] = len(index["skills"])
     
     with _CONTENT_INDEX_LOCK:
         stats_copy["content_files_indexed"] = len(_CONTENT_INDEX) if _CONTENT_INDEX else 0
