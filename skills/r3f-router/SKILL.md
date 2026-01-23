@@ -171,10 +171,10 @@ r3f-fundamentals (default)
 
 ## Reference
 
-See individual skill files for detailed patterns:
+Load these skills for detailed patterns:
 
-- `/mnt/skills/user/r3f-fundamentals/SKILL.md`
-- `/mnt/skills/user/r3f-geometry/SKILL.md`
-- `/mnt/skills/user/r3f-materials/SKILL.md`
-- `/mnt/skills/user/r3f-performance/SKILL.md`
-- `/mnt/skills/user/r3f-drei/SKILL.md`
+- `r3f-fundamentals` — Canvas, scene, camera, lights, useFrame
+- `r3f-geometry` — BufferGeometry, vertices, instancing
+- `r3f-materials` — Shaders, textures, uniforms, PBR
+- `r3f-performance` — LOD, culling, optimization
+- `r3f-drei` — Helpers, controls, loaders, abstractions

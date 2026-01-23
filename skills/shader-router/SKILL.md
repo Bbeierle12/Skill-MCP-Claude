@@ -182,9 +182,9 @@ User Request
 
 ## Reference
 
-See individual skill files for detailed patterns:
+Load these skills for detailed patterns:
 
-- `/mnt/skills/user/shader-fundamentals/SKILL.md`
-- `/mnt/skills/user/shader-noise/SKILL.md`
-- `/mnt/skills/user/shader-sdf/SKILL.md`
-- `/mnt/skills/user/shader-effects/SKILL.md`
+- `shader-fundamentals` — GLSL basics, uniforms, varyings, coordinate systems
+- `shader-noise` — Perlin, Simplex, FBM, Worley, procedural patterns
+- `shader-sdf` — Signed distance functions, 2D/3D shapes, booleans
+- `shader-effects` — Glow, chromatic aberration, distortion, post-processing

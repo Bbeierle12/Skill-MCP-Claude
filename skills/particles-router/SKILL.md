@@ -204,8 +204,8 @@ Most effects need all 3 skills
 
 ## Reference
 
-See individual skill files for detailed patterns:
+Load these skills for detailed patterns:
 
-- `/mnt/skills/user/particles-gpu/SKILL.md`
-- `/mnt/skills/user/particles-physics/SKILL.md`
-- `/mnt/skills/user/particles-lifecycle/SKILL.md`
+- `particles-gpu` — Buffer setup, shader rendering, instancing
+- `particles-physics` — Forces, gravity, attractors, collisions
+- `particles-lifecycle` — Emission, pooling, fade, trails

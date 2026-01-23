@@ -19,7 +19,7 @@ Master router dispatching to 6 domain routers for comprehensive visual experienc
 | Domain | Router | Skills | Focus |
 |--------|--------|--------|-------|
 | 3D Rendering | `r3f-router` | 6 | React Three Fiber, scenes, materials, camera |
-| Shaders | `shaders-router` | 5 | GLSL, custom materials, visual effects |
+| Shaders | `shader-router` | 5 | GLSL, custom materials, visual effects |
 | Particles | `particles-router` | 4 | Particle systems, physics, GPU optimization |
 | Post-Processing | `postfx-router` | 3 | Bloom, effects, EffectComposer |
 | Animation | `gsap-router` | 4 | GSAP tweens, timelines, scroll, React |
@@ -40,14 +40,14 @@ Optional:  gsap-router → Camera animations
 ```
 Primary:   audio-router → Playback, analysis, reactive
 Secondary: r3f-router → 3D scene for visuals
-Supporting: shaders-router → Custom visual effects
+Supporting: shader-router → Custom visual effects
            postfx-router → Bloom, glow
            particles-router → Beat-reactive particles
 ```
 
 ### Creative Coding / Generative Art
 ```
-Primary:   shaders-router → Custom fragment shaders
+Primary:   shader-router → Custom fragment shaders
 Secondary: r3f-router → Render pipeline
 Supporting: postfx-router → Effects chain
 ```
@@ -74,7 +74,7 @@ Supporting: postfx-router → Dramatic effects
 Primary:   particles-router → Particle systems
 Secondary: r3f-router → Scene setup
 Supporting: postfx-router → Bloom for particles
-           shaders-router → Custom particle shaders
+           shader-router → Custom particle shaders
 ```
 
 ## Signal-Based Routing
@@ -87,7 +87,7 @@ Supporting: postfx-router → Bloom for particles
 - "3D model", "GLTF", "environment"
 - "orbit controls", "transform"
 
-**shaders-router** (Custom Shaders):
+**shader-router** (Custom Shaders):
 - "shader", "GLSL", "fragment", "vertex"
 - "custom material", "uniform"
 - "procedural", "noise", "pattern"
@@ -121,7 +121,7 @@ Supporting: postfx-router → Bloom for particles
 ### Cinematic 3D Scene
 ```
 r3f-router     → Scene, camera, lighting
-shaders-router → Custom materials
+shader-router → Custom materials
 postfx-router  → Bloom, color grading, vignette
 gsap-router    → Camera movements
 ```
@@ -130,7 +130,7 @@ gsap-router    → Camera movements
 ```
 audio-router     → Load music, analyze frequencies
 r3f-router       → 3D visualization geometry
-shaders-router   → Audio-reactive shaders
+shader-router   → Audio-reactive shaders
 particles-router → Beat-triggered particles
 postfx-router    → Bloom, chromatic aberration
 ```
@@ -239,7 +239,7 @@ Based on secondary requirements:
 - Need smooth animations? → `gsap-router`
 - Need particles? → `particles-router`
 - Need audio? → `audio-router`
-- Need custom materials? → `shaders-router`
+- Need custom materials? → `shader-router`
 
 ### Step 4: Load Domain Skills
 Each domain router will direct to specific skills.
@@ -281,7 +281,7 @@ r3f-router
 ├── Independent (can use alone)
 └── Enhanced by: shaders, postfx, particles
 
-shaders-router
+shader-router
 ├── Requires: r3f (for Three.js context)
 └── Enhanced by: postfx
 

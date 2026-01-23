@@ -15,9 +15,9 @@ Act as a Principal Research Scientist and Computer Science Educator. Prepare doc
 
 1. **Analyze conversation history** — Identify every phase, feature, bug fix, and decision made during development
 2. **Read the document template** — Load `references/document-template.md` for the complete structure specification
-3. **Read the docx skill** — Load `/mnt/skills/public/docx/SKILL.md` and its `docx-js.md` reference for Word document creation
+3. **Read the docx skill** — Load the `docx` skill and its `docx-js.md` reference for Word document creation
 4. **Generate the document** — Create a comprehensive .docx file following the template structure
-5. **Deliver to user** — Save to `/mnt/user-data/outputs/` with a descriptive filename
+5. **Deliver to user** — Save to the user's preferred output location with a descriptive filename
 
 ## Output Specifications
 

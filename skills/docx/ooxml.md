@@ -286,15 +286,14 @@ Use the Document class from `scripts/document.py` for all tracked changes and co
 
 ```bash
 # Find the docx skill root (directory containing scripts/ and ooxml/)
-find /mnt/skills -name "document.py" -path "*/docx/scripts/*" 2>/dev/null | head -1
-# Example output: /mnt/skills/public/docx/scripts/document.py
-# Skill root is: /mnt/skills/public/docx
+# The skill root is the directory containing scripts/ and ooxml/
+DOCX_SKILL_ROOT="/path/to/skills/docx"  # Adjust to your deployment
 
 # Option 1: Export for entire session
-export PYTHONPATH=/mnt/skills/public/docx:$PYTHONPATH
+export PYTHONPATH=$DOCX_SKILL_ROOT:$PYTHONPATH
 
 # Option 2: Inline with script execution
-PYTHONPATH=/mnt/skills/public/docx python3 your_script.py
+PYTHONPATH=$DOCX_SKILL_ROOT python3 your_script.py
 ```
 
 **In your script**, import normally:
