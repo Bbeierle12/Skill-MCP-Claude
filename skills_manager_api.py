@@ -9,11 +9,38 @@ import subprocess
 import os
 import shutil
 import base64
+from datetime import datetime, timezone
+from typing import Any
+
+from creation_station_db import (
+    connect,
+    create_version,
+    decode_skill_file,
+    fetch_skill_versions,
+    fetch_version_files,
+    init_db,
+    load_skill_files,
+    publish_version,
+    seed_skills_from_filesystem,
+    upsert_skill,
+    write_version_to_filesystem,
+    SkillFile,
+)
 
 app = Flask(__name__)
 CORS(app)
 
 SKILLS_DIR = Path(__file__).parent / "skills"
+MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "12000"))
+MAX_OUTPUT_CHARS = int(os.environ.get("MAX_OUTPUT_CHARS", "8000"))
+RUN_TIMEOUT_SECONDS = int(os.environ.get("RUN_TIMEOUT_SECONDS", "180"))
+
+init_db()
+seed_skills_from_filesystem(SKILLS_DIR)
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 def sanitize_name(name: str) -> str:
     """Convert name to valid skill directory name."""
@@ -34,6 +61,86 @@ def find_claude_cli():
             return path
     return shutil.which('claude')
 
+
+def get_skill_record(conn, name: str) -> tuple[int, int | None] | None:
+    row = conn.execute(
+        "SELECT id, current_published_version_id FROM skills WHERE name = ?",
+        (name,),
+    ).fetchone()
+    if not row:
+        return None
+    return int(row["id"]), row["current_published_version_id"]
+
+
+def snapshot_skill_to_db(skill_name: str, summary: str) -> int:
+    skill_dir = SKILLS_DIR / skill_name
+    files = load_skill_files(skill_dir)
+    with connect() as conn:
+        skill_id = upsert_skill(conn, skill_name)
+        version_id = create_version(
+            conn,
+            skill_id=skill_id,
+            files=files,
+            status="published",
+            summary=summary,
+            published=True,
+        )
+        publish_version(conn, skill_id, version_id)
+        return version_id
+
+
+def build_skill_context(selected_skills: list[dict[str, Any]]) -> tuple[str, bool]:
+    sections: list[str] = []
+    truncated = False
+    for item in selected_skills:
+        skill_name = item.get("skill_name") or item.get("name")
+        if not skill_name:
+            continue
+        version_id = item.get("version_id")
+        include_references = bool(item.get("include_references", False))
+
+        header = f"## Skill: {skill_name}"
+        skill_chunks = [header]
+        content = ""
+        references: list[str] = []
+        with connect() as conn:
+            if version_id:
+                rows = fetch_version_files(conn, int(version_id))
+                for row in rows:
+                    file_path = row["path"]
+                    file_content = decode_skill_file(row)
+                    if file_path == "SKILL.md":
+                        content = str(file_content.content)
+                    elif include_references and file_path.startswith("references/"):
+                        references.append(
+                            f"### Reference: {file_path}\n{file_content.content}"
+                        )
+            else:
+                skill_dir = SKILLS_DIR / skill_name
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    content = skill_md.read_text(encoding="utf-8")
+                if include_references:
+                    refs_dir = skill_dir / "references"
+                    if refs_dir.exists():
+                        for ref_file in refs_dir.rglob("*.md"):
+                            references.append(
+                                f"### Reference: {ref_file.name}\n"
+                                f"{ref_file.read_text(encoding='utf-8')}"
+                            )
+
+        if content:
+            skill_chunks.append(content)
+        if references:
+            skill_chunks.extend(references)
+        sections.append("\n\n".join(skill_chunks))
+
+    context = "\n\n---\n\n".join(sections)
+    if len(context) > MAX_CONTEXT_CHARS:
+        context = context[:MAX_CONTEXT_CHARS]
+        truncated = True
+    return context, truncated
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'skills-manager.html')
@@ -41,6 +148,7 @@ def index():
 @app.route('/api/skills', methods=['GET'])
 def list_skills():
     """List all skills with their metadata."""
+    include_content = request.args.get("include_content", "1") == "1"
     skills = []
     for skill_dir in SKILLS_DIR.iterdir():
         if skill_dir.is_dir():
@@ -55,21 +163,19 @@ def list_skills():
                     pass
             
             skill_file = skill_dir / "SKILL.md"
-            if skill_file.exists():
+            if skill_file.exists() and include_content:
                 content = skill_file.read_text(encoding="utf-8")
                 skill_data["content"] = content
-                
-                if "description" not in skill_data:
-                    if content.startswith("---"):
-                        try:
-                            end = content.index("---", 3)
-                            frontmatter = content[3:end]
-                            for line in frontmatter.split("\n"):
-                                if line.startswith("description:"):
-                                    skill_data["description"] = line.split(":", 1)[1].strip()
-                                    break
-                        except:
-                            pass
+                if "description" not in skill_data and content.startswith("---"):
+                    try:
+                        end = content.index("---", 3)
+                        frontmatter = content[3:end]
+                        for line in frontmatter.split("\n"):
+                            if line.startswith("description:"):
+                                skill_data["description"] = line.split(":", 1)[1].strip()
+                                break
+                    except ValueError:
+                        pass
             
             # Get file structure info
             skill_data["has_scripts"] = (skill_dir / "scripts").exists()
@@ -83,25 +189,37 @@ def list_skills():
 @app.route('/api/skills/<name>', methods=['GET'])
 def get_skill(name: str):
     """Get a specific skill's details including all files."""
+    version_id = request.args.get("version_id")
+    include_content = request.args.get("include_content", "1") == "1"
     skill_dir = SKILLS_DIR / name
-    if not skill_dir.exists():
+    if not skill_dir.exists() and not version_id:
         return jsonify({"error": f"Skill '{name}' not found"}), 404
     
     skill_data = {"name": name, "files": []}
-    
-    meta_file = skill_dir / "_meta.json"
-    if meta_file.exists():
-        skill_data.update(json.loads(meta_file.read_text(encoding="utf-8")))
-    
-    skill_file = skill_dir / "SKILL.md"
-    if skill_file.exists():
-        skill_data["content"] = skill_file.read_text(encoding="utf-8")
-    
-    # List all files in skill directory
-    for f in skill_dir.rglob("*"):
-        if f.is_file():
-            rel_path = f.relative_to(skill_dir)
-            skill_data["files"].append(str(rel_path))
+
+    if version_id:
+        with connect() as conn:
+            rows = fetch_version_files(conn, int(version_id))
+            for row in rows:
+                file_path = row["path"]
+                skill_data["files"].append(file_path)
+                if include_content and file_path == "SKILL.md":
+                    skill_data["content"] = decode_skill_file(row).content
+            skill_data["version_id"] = int(version_id)
+    else:
+        meta_file = skill_dir / "_meta.json"
+        if meta_file.exists():
+            skill_data.update(json.loads(meta_file.read_text(encoding="utf-8")))
+
+        skill_file = skill_dir / "SKILL.md"
+        if skill_file.exists() and include_content:
+            skill_data["content"] = skill_file.read_text(encoding="utf-8")
+
+        # List all files in skill directory
+        for f in skill_dir.rglob("*"):
+            if f.is_file():
+                rel_path = f.relative_to(skill_dir)
+                skill_data["files"].append(str(rel_path))
     
     return jsonify(skill_data)
 
@@ -140,8 +258,9 @@ description: {description}
         "source": "imported"
     }
     (skill_dir / "_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    
-    return jsonify({"success": True, "name": name, "path": str(skill_dir)})
+    version_id = snapshot_skill_to_db(name, "Created via API")
+
+    return jsonify({"success": True, "name": name, "path": str(skill_dir), "version_id": version_id})
 
 @app.route('/api/skills/<name>', methods=['PUT'])
 def update_skill(name: str):
@@ -177,8 +296,9 @@ description: {description}
         "tags": data.get("tags", meta.get("tags", []))
     })
     meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    
-    return jsonify({"success": True, "name": name})
+    version_id = snapshot_skill_to_db(name, "Updated via API")
+
+    return jsonify({"success": True, "name": name, "version_id": version_id})
 
 @app.route('/api/skills/<name>', methods=['DELETE'])
 def delete_skill(name: str):
@@ -188,7 +308,396 @@ def delete_skill(name: str):
         return jsonify({"error": f"Skill '{name}' not found"}), 404
     
     shutil.rmtree(skill_dir)
+    with connect() as conn:
+        conn.execute("DELETE FROM skill_files WHERE skill_version_id IN (SELECT id FROM skill_versions WHERE skill_id IN (SELECT id FROM skills WHERE name = ?))", (name,))
+        conn.execute("DELETE FROM skill_versions WHERE skill_id IN (SELECT id FROM skills WHERE name = ?)", (name,))
+        conn.execute("DELETE FROM skills WHERE name = ?", (name,))
     return jsonify({"success": True, "name": name})
+
+
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    cli_path = find_claude_cli()
+    with connect() as conn:
+        skill_count = conn.execute("SELECT COUNT(*) AS count FROM skills").fetchone()["count"]
+        run_count = conn.execute("SELECT COUNT(*) AS count FROM runs").fetchone()["count"]
+    return jsonify(
+        {
+            "status": "ok",
+            "skills": skill_count,
+            "runs": run_count,
+            "claude_cli_available": bool(cli_path),
+            "db_path": str(Path(os.environ.get("CREATION_STATION_DB_PATH", "creation_station.db")).resolve()),
+        }
+    )
+
+
+@app.route('/api/skills/<name>/versions', methods=['GET'])
+def list_skill_versions(name: str):
+    with connect() as conn:
+        record = get_skill_record(conn, name)
+        if not record:
+            return jsonify({"error": f"Skill '{name}' not found"}), 404
+        skill_id, current_version_id = record
+        versions = [
+            {
+                "id": row["id"],
+                "version_number": row["version_number"],
+                "status": row["status"],
+                "summary": row["summary"],
+                "created_at": row["created_at"],
+                "published_at": row["published_at"],
+            }
+            for row in fetch_skill_versions(conn, skill_id)
+        ]
+    return jsonify(
+        {
+            "skill": name,
+            "current_published_version_id": current_version_id,
+            "versions": versions,
+        }
+    )
+
+
+@app.route('/api/skills/<name>/versions', methods=['POST'])
+def create_skill_version(name: str):
+    data = request.json or {}
+    files_data = data.get("files")
+    summary = data.get("summary")
+    status = data.get("status", "draft")
+    with connect() as conn:
+        skill_id = upsert_skill(conn, name)
+        if files_data:
+            files: list[SkillFile] = []
+            for item in files_data:
+                path = item.get("path")
+                content = item.get("content", "")
+                is_binary = bool(item.get("base64", False))
+                if not path:
+                    continue
+                files.append(SkillFile(path=path, content=content, is_binary=is_binary))
+        else:
+            skill_dir = SKILLS_DIR / name
+            if not skill_dir.exists():
+                return jsonify({"error": f"Skill '{name}' not found"}), 404
+            files = load_skill_files(skill_dir)
+        version_id = create_version(
+            conn, skill_id=skill_id, files=files, status=status, summary=summary
+        )
+    return jsonify({"success": True, "skill": name, "version_id": version_id})
+
+
+@app.route('/api/skills/<name>/publish', methods=['POST'])
+def publish_skill_version(name: str):
+    data = request.json or {}
+    version_id = data.get("version_id")
+    if not version_id:
+        return jsonify({"error": "version_id required"}), 400
+    with connect() as conn:
+        record = get_skill_record(conn, name)
+        if not record:
+            return jsonify({"error": f"Skill '{name}' not found"}), 404
+        skill_id, _ = record
+        skill_dir = SKILLS_DIR / name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        write_version_to_filesystem(conn, int(version_id), skill_dir)
+        publish_version(conn, skill_id, int(version_id))
+    return jsonify({"success": True, "skill": name, "version_id": int(version_id)})
+
+
+def lint_skill(content: str) -> dict[str, list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    suggestions: list[str] = []
+
+    if "## Overview" not in content:
+        errors.append("Missing required 'Overview' section.")
+    if "## When to Use" not in content:
+        errors.append("Missing required 'When to Use' section.")
+    if "```" not in content:
+        warnings.append("Add at least one example code block.")
+    if "When NOT to use" not in content and "When Not to Use" not in content:
+        suggestions.append("Consider adding a 'When NOT to use' section.")
+    if "Failure" not in content and "Caveat" not in content:
+        suggestions.append("Add failure modes or caveats to set expectations.")
+    return {"errors": errors, "warnings": warnings, "suggestions": suggestions}
+
+
+@app.route('/api/skills/<name>/validate', methods=['POST'])
+def validate_skill(name: str):
+    data = request.json or {}
+    content = data.get("content")
+    if not content:
+        skill_dir = SKILLS_DIR / name
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_file.exists():
+            return jsonify({"error": f"Skill '{name}' not found"}), 404
+        content = skill_file.read_text(encoding="utf-8")
+    results = lint_skill(content)
+    return jsonify(results)
+
+
+@app.route('/api/runs', methods=['POST'])
+def create_run():
+    data = request.json or {}
+    prompt = data.get("prompt_text", "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt_text is required"}), 400
+    runtime = data.get("runtime", "claude_cli")
+    model_label = data.get("model_label", "claude-cli-default")
+    selected_skills = data.get("selected_skills", [])
+    settings = data.get("settings_json") or {}
+
+    context, truncated = build_skill_context(selected_skills)
+    if truncated:
+        settings = {**settings, "context_truncated": True}
+
+    created_at = utc_now()
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO runs (
+                created_at, runtime, model_label, prompt_text, settings_json,
+                selected_skills_json, status, started_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                created_at,
+                runtime,
+                model_label,
+                prompt,
+                json.dumps(settings),
+                json.dumps(selected_skills),
+                "running",
+                created_at,
+            ),
+        )
+        run_id = int(cursor.lastrowid)
+
+    cli_path = find_claude_cli()
+    if runtime != "claude_cli":
+        error_text = f"Unsupported runtime: {runtime}"
+        with connect() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, error_text = ?, finished_at = ? WHERE id = ?",
+                ("failed", error_text, utc_now(), run_id),
+            )
+        return jsonify({"run_id": run_id, "status": "failed", "error": error_text})
+    if not cli_path:
+        error_text = "Claude Code CLI not found"
+        with connect() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, error_text = ?, finished_at = ? WHERE id = ?",
+                ("failed", error_text, utc_now(), run_id),
+            )
+        return jsonify({"run_id": run_id, "status": "failed", "error": error_text}), 404
+
+    full_prompt = f"Using this skill context:\n\n{context}\n\n{prompt}" if context else prompt
+    started_at = datetime.now(timezone.utc)
+    try:
+        result = subprocess.run(
+            [cli_path, "-p", full_prompt],
+            capture_output=True,
+            text=True,
+            cwd=str(SKILLS_DIR),
+            timeout=RUN_TIMEOUT_SECONDS,
+        )
+        finished_at = datetime.now(timezone.utc)
+        latency_ms = int((finished_at - started_at).total_seconds() * 1000)
+        output_text = result.stdout.strip()
+        if len(output_text) > MAX_OUTPUT_CHARS:
+            output_text = output_text[:MAX_OUTPUT_CHARS]
+        with connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO run_outputs (
+                    run_id, output_text, stdout_text, stderr_text, return_code, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    output_text,
+                    result.stdout,
+                    result.stderr,
+                    result.returncode,
+                    utc_now(),
+                ),
+            )
+            conn.execute(
+                """
+                UPDATE runs
+                SET status = ?, finished_at = ?, latency_ms = ?
+                WHERE id = ?
+                """,
+                ("succeeded", finished_at.isoformat(), latency_ms, run_id),
+            )
+        return jsonify({"run_id": run_id, "status": "succeeded", "output_text": output_text})
+    except subprocess.TimeoutExpired:
+        with connect() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, error_text = ?, finished_at = ? WHERE id = ?",
+                ("failed", "Timeout", utc_now(), run_id),
+            )
+        return jsonify({"run_id": run_id, "status": "failed", "error": "Timeout"}), 408
+    except Exception as exc:
+        with connect() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, error_text = ?, finished_at = ? WHERE id = ?",
+                ("failed", str(exc), utc_now(), run_id),
+            )
+        return jsonify({"run_id": run_id, "status": "failed", "error": str(exc)}), 500
+
+
+@app.route('/api/runs/<int:run_id>', methods=['GET'])
+def get_run(run_id: int):
+    with connect() as conn:
+        run_row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        if not run_row:
+            return jsonify({"error": "Run not found"}), 404
+        output_row = conn.execute(
+            "SELECT * FROM run_outputs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        feedback_rows = conn.execute(
+            "SELECT * FROM feedback WHERE run_id = ? ORDER BY created_at DESC",
+            (run_id,),
+        ).fetchall()
+
+    run_data = dict(run_row)
+    run_data["settings_json"] = json.loads(run_data.get("settings_json") or "{}")
+    run_data["selected_skills_json"] = json.loads(
+        run_data.get("selected_skills_json") or "[]"
+    )
+    run_data["output"] = dict(output_row) if output_row else None
+    run_data["feedback"] = [dict(row) for row in feedback_rows]
+    return jsonify(run_data)
+
+
+@app.route('/api/runs', methods=['GET'])
+def list_runs():
+    limit = int(request.args.get("limit", "25"))
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM runs ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return jsonify({"runs": [dict(row) for row in rows]})
+
+
+@app.route('/api/runs/<int:run_id>/feedback', methods=['POST'])
+def create_feedback(run_id: int):
+    data = request.json or {}
+    rating = data.get("rating")
+    if not rating:
+        return jsonify({"error": "rating is required"}), 400
+    tags = data.get("tags", [])
+    comment = data.get("comment", "")
+    with connect() as conn:
+        run_row = conn.execute("SELECT id FROM runs WHERE id = ?", (run_id,)).fetchone()
+        if not run_row:
+            return jsonify({"error": "Run not found"}), 404
+        conn.execute(
+            """
+            INSERT INTO feedback (run_id, rating, tags_json, comment_text, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (run_id, rating, json.dumps(tags), comment, utc_now()),
+        )
+    return jsonify({"success": True})
+
+
+@app.route('/api/runs/<int:run_id>/feedback', methods=['GET'])
+def list_feedback(run_id: int):
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM feedback WHERE run_id = ? ORDER BY created_at DESC",
+            (run_id,),
+        ).fetchall()
+    return jsonify({"feedback": [dict(row) for row in rows]})
+
+
+@app.route('/api/test-cases', methods=['POST'])
+def create_test_case():
+    data = request.json or {}
+    title = data.get("title", "").strip()
+    prompt_text = data.get("prompt_text", "").strip()
+    if not title or not prompt_text:
+        return jsonify({"error": "title and prompt_text are required"}), 400
+    context_json = json.dumps(data.get("context_json") or {})
+    expected_traits_json = json.dumps(data.get("expected_traits_json") or [])
+    forbidden_traits_json = json.dumps(data.get("forbidden_traits_json") or [])
+    rubric_json = json.dumps(data.get("rubric_json") or {})
+    linked_skill_name = data.get("linked_skill_name")
+    linked_skill_version_id = data.get("linked_skill_version_id")
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO test_cases (
+                created_at, title, prompt_text, context_json, expected_traits_json,
+                forbidden_traits_json, rubric_json, linked_skill_name, linked_skill_version_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                utc_now(),
+                title,
+                prompt_text,
+                context_json,
+                expected_traits_json,
+                forbidden_traits_json,
+                rubric_json,
+                linked_skill_name,
+                linked_skill_version_id,
+            ),
+        )
+        test_case_id = int(cursor.lastrowid)
+    return jsonify({"success": True, "test_case_id": test_case_id})
+
+
+@app.route('/api/test-cases', methods=['GET'])
+def list_test_cases():
+    limit = int(request.args.get("limit", "50"))
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM test_cases ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return jsonify({"test_cases": [dict(row) for row in rows]})
+
+
+@app.route('/api/test-cases/from-run/<int:run_id>', methods=['POST'])
+def create_test_case_from_run(run_id: int):
+    data = request.json or {}
+    title = data.get("title")
+    with connect() as conn:
+        run_row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        if not run_row:
+            return jsonify({"error": "Run not found"}), 404
+    prompt_text = run_row["prompt_text"]
+    context_json = json.dumps({"selected_skills": json.loads(run_row["selected_skills_json"] or "[]")})
+    test_title = title or f"Run {run_id} test case"
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO test_cases (
+                created_at, title, prompt_text, context_json,
+                expected_traits_json, forbidden_traits_json, rubric_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                utc_now(),
+                test_title,
+                prompt_text,
+                context_json,
+                json.dumps(data.get("expected_traits_json") or []),
+                json.dumps(data.get("forbidden_traits_json") or []),
+                json.dumps(data.get("rubric_json") or {}),
+            ),
+        )
+        test_case_id = int(cursor.lastrowid)
+    return jsonify({"success": True, "test_case_id": test_case_id})
 
 # ============ Import Folder/Files ============
 
@@ -251,11 +760,13 @@ def import_folder():
             meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
         
         file_count = len(list(dest.rglob("*")))
+        version_id = snapshot_skill_to_db(skill_name, "Imported from folder")
         return jsonify({
             "success": True,
             "name": skill_name,
             "path": str(dest),
-            "files_imported": file_count
+            "files_imported": file_count,
+            "version_id": version_id
         })
         
     except Exception as e:
@@ -322,7 +833,8 @@ def import_files():
     return jsonify({
         "success": True,
         "name": skill_name,
-        "files_imported": imported
+        "files_imported": imported,
+        "version_id": snapshot_skill_to_db(skill_name, "Imported files")
     })
 
 @app.route('/api/import/json', methods=['POST'])
@@ -378,7 +890,14 @@ def import_files_json():
         meta = {"name": skill_name, "description": description, "tags": [], "sub_skills": [], "source": "json-upload"}
         meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     
-    return jsonify({"success": True, "name": skill_name, "files_imported": imported})
+    return jsonify(
+        {
+            "success": True,
+            "name": skill_name,
+            "files_imported": imported,
+            "version_id": snapshot_skill_to_db(skill_name, "Imported JSON files"),
+        }
+    )
 
 @app.route('/api/browse', methods=['GET'])
 def browse_filesystem():
