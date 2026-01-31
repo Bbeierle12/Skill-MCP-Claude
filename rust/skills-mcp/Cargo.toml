@@ -1,0 +1,74 @@
+[package]
+name = "skills-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Skills MCP Server - Rust implementation"
+license = "MIT"
+authors = ["Bbeierle12"]
+
+[lib]
+name = "skills_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "skills-mcp-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "skills-api-server"
+path = "src/bin/api.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP server (for API)
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+
+# MCP SDK (when available, use placeholder for now)
+# mcp-server = "0.1"
+
+# File watching
+notify = "6"
+notify-debouncer-mini = "0.4"
+
+# Concurrent data structures
+dashmap = "6"
+parking_lot = "0.12"
+
+# Search / text processing
+regex = "1"
+unicode-normalization = "0.1"
+
+# Validation
+thiserror = "1"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Path handling
+walkdir = "2"
+globset = "0.4"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
+tokio-test = "0.4"
+
+[features]
+default = []
+mcp = []  # Enable when MCP SDK is integrated
