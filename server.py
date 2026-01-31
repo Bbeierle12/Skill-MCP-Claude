@@ -2,11 +2,12 @@
 from fastmcp import FastMCP
 from pathlib import Path
 from datetime import datetime
-from threading import Thread
+from threading import Thread, Lock
 import json
 import re
 import time
 import logging
+from collections import deque
 
 # Configure logging
 logging.basicConfig(
@@ -18,15 +19,26 @@ logger = logging.getLogger("skills-server")
 mcp = FastMCP("skills-server")
 SKILLS_DIR = Path(__file__).parent / "skills"
 
+# Ensure skills directory exists
+if not SKILLS_DIR.exists():
+    logger.warning(f"Skills directory not found, creating: {SKILLS_DIR}")
+    SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+
 _INDEX = None
 _CONTENT_INDEX = None  # Full-text search index
 _FILE_MTIMES = {}  # For file watching
 _USAGE_STATS = {
     "tool_calls": {},
     "skill_loads": {},
-    "searches": [],
+    "searches": deque(maxlen=100),  # Use deque for efficient size limiting
     "start_time": datetime.now().isoformat()
 }
+
+# Thread synchronization locks
+_INDEX_LOCK = Lock()
+_CONTENT_INDEX_LOCK = Lock()
+_FILE_MTIMES_LOCK = Lock()
+_STATS_LOCK = Lock()
 
 # Schema for _meta.json validation
 META_SCHEMA = {
@@ -37,6 +49,24 @@ META_SCHEMA = {
         "optional": ["triggers"]
     }
 }
+
+
+def is_safe_skill_name(name: str) -> bool:
+    """Validate that a skill name is safe for filesystem operations."""
+    if not name or not isinstance(name, str):
+        return False
+    # Only allow alphanumeric, hyphens, and underscores
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', name))
+
+
+def validate_skill_path(skill_path: Path) -> bool:
+    """Validate that a resolved path is within SKILLS_DIR."""
+    try:
+        resolved_path = skill_path.resolve()
+        skills_dir_resolved = SKILLS_DIR.resolve()
+        return str(resolved_path).startswith(str(skills_dir_resolved))
+    except (OSError, ValueError):
+        return False
 
 
 def validate_meta(meta: dict, skill_name: str) -> list[str]:
@@ -50,8 +80,11 @@ def validate_meta(meta: dict, skill_name: str) -> list[str]:
     if "name" in meta and meta["name"] != skill_name:
         errors.append(f"{skill_name}: 'name' field ({meta['name']}) doesn't match directory name")
 
-    if "tags" in meta and not isinstance(meta["tags"], list):
-        errors.append(f"{skill_name}: 'tags' must be a list")
+    if "tags" in meta:
+        if not isinstance(meta["tags"], list):
+            errors.append(f"{skill_name}: 'tags' must be a list")
+        elif not all(isinstance(t, str) for t in meta["tags"]):
+            errors.append(f"{skill_name}: All tags must be strings")
 
     if "sub_skills" in meta:
         if not isinstance(meta["sub_skills"], list):
@@ -69,6 +102,10 @@ def build_content_index() -> dict:
     """Build full-text search index from skill content."""
     index = {}
 
+    if not SKILLS_DIR.exists():
+        logger.warning(f"Skills directory does not exist: {SKILLS_DIR}")
+        return index
+
     for skill_dir in SKILLS_DIR.iterdir():
         if not skill_dir.is_dir():
             continue
@@ -78,37 +115,46 @@ def build_content_index() -> dict:
         # Index SKILL.md
         skill_file = skill_dir / "SKILL.md"
         if skill_file.exists():
-            content = skill_file.read_text(encoding="utf-8", errors="ignore").lower()
-            index[f"{skill_name}:SKILL.md"] = {
-                "domain": skill_name,
-                "sub_skill": None,
-                "file": "SKILL.md",
-                "content": content
-            }
+            try:
+                content = skill_file.read_text(encoding="utf-8", errors="ignore").lower()
+                index[f"{skill_name}:SKILL.md"] = {
+                    "domain": skill_name,
+                    "sub_skill": None,
+                    "file": "SKILL.md",
+                    "content": content
+                }
+            except (OSError, UnicodeDecodeError) as e:
+                logger.warning(f"Failed to read {skill_file}: {e}")
 
         # Index references
         refs_dir = skill_dir / "references"
         if refs_dir.exists():
             for ref_file in refs_dir.glob("*.md"):
-                content = ref_file.read_text(encoding="utf-8", errors="ignore").lower()
-                index[f"{skill_name}:references/{ref_file.name}"] = {
-                    "domain": skill_name,
-                    "sub_skill": ref_file.stem,
-                    "file": f"references/{ref_file.name}",
-                    "content": content
-                }
+                try:
+                    content = ref_file.read_text(encoding="utf-8", errors="ignore").lower()
+                    index[f"{skill_name}:references/{ref_file.name}"] = {
+                        "domain": skill_name,
+                        "sub_skill": ref_file.stem,
+                        "file": f"references/{ref_file.name}",
+                        "content": content
+                    }
+                except (OSError, UnicodeDecodeError) as e:
+                    logger.warning(f"Failed to read {ref_file}: {e}")
 
         # Index scripts
         scripts_dir = skill_dir / "scripts"
         if scripts_dir.exists():
             for script_file in scripts_dir.glob("*.md"):
-                content = script_file.read_text(encoding="utf-8", errors="ignore").lower()
-                index[f"{skill_name}:scripts/{script_file.name}"] = {
-                    "domain": skill_name,
-                    "sub_skill": script_file.stem.replace('.js', '').replace('.ts', ''),
-                    "file": f"scripts/{script_file.name}",
-                    "content": content
-                }
+                try:
+                    content = script_file.read_text(encoding="utf-8", errors="ignore").lower()
+                    index[f"{skill_name}:scripts/{script_file.name}"] = {
+                        "domain": skill_name,
+                        "sub_skill": script_file.stem.replace('.js', '').replace('.ts', ''),
+                        "file": f"scripts/{script_file.name}",
+                        "content": content
+                    }
+                except (OSError, UnicodeDecodeError) as e:
+                    logger.warning(f"Failed to read {script_file}: {e}")
 
     return index
 
@@ -118,6 +164,10 @@ def load_index() -> dict:
     global _CONTENT_INDEX
 
     index = {"skills": [], "validation_errors": []}
+
+    if not SKILLS_DIR.exists():
+        logger.error(f"Skills directory does not exist: {SKILLS_DIR}")
+        return index
 
     for skill_dir in SKILLS_DIR.iterdir():
         if skill_dir.is_dir():
@@ -137,9 +187,14 @@ def load_index() -> dict:
                     error = f"{skill_dir.name}: Invalid JSON in _meta.json: {e}"
                     index["validation_errors"].append(error)
                     logger.error(error)
+                except (OSError, UnicodeDecodeError) as e:
+                    error = f"{skill_dir.name}: Failed to read _meta.json: {e}"
+                    index["validation_errors"].append(error)
+                    logger.error(error)
 
     # Build content index for full-text search
-    _CONTENT_INDEX = build_content_index()
+    with _CONTENT_INDEX_LOCK:
+        _CONTENT_INDEX = build_content_index()
     logger.info(f"Loaded {len(index['skills'])} skills, indexed {len(_CONTENT_INDEX)} files")
 
     return index
@@ -148,31 +203,32 @@ def load_index() -> dict:
 def get_index() -> dict:
     """Get the current index, reloading if needed."""
     global _INDEX
-    if _INDEX is None:
-        _INDEX = load_index()
-    return _INDEX
+    with _INDEX_LOCK:
+        if _INDEX is None:
+            _INDEX = load_index()
+        return _INDEX
 
 
 def track_usage(tool_name: str, details: dict = None):
     """Track tool usage for metrics."""
-    if tool_name not in _USAGE_STATS["tool_calls"]:
-        _USAGE_STATS["tool_calls"][tool_name] = 0
-    _USAGE_STATS["tool_calls"][tool_name] += 1
+    with _STATS_LOCK:
+        if tool_name not in _USAGE_STATS["tool_calls"]:
+            _USAGE_STATS["tool_calls"][tool_name] = 0
+        _USAGE_STATS["tool_calls"][tool_name] += 1
 
-    if details:
-        if "domain" in details:
-            domain = details["domain"]
-            if domain not in _USAGE_STATS["skill_loads"]:
-                _USAGE_STATS["skill_loads"][domain] = 0
-            _USAGE_STATS["skill_loads"][domain] += 1
+        if details:
+            if "domain" in details:
+                domain = details["domain"]
+                if domain not in _USAGE_STATS["skill_loads"]:
+                    _USAGE_STATS["skill_loads"][domain] = 0
+                _USAGE_STATS["skill_loads"][domain] += 1
 
-        if "query" in details:
-            _USAGE_STATS["searches"].append({
-                "query": details["query"],
-                "timestamp": datetime.now().isoformat()
-            })
-            # Keep only last 100 searches
-            _USAGE_STATS["searches"] = _USAGE_STATS["searches"][-100:]
+            if "query" in details:
+                _USAGE_STATS["searches"].append({
+                    "query": details["query"],
+                    "timestamp": datetime.now().isoformat()
+                })
+                # Deque automatically limits to maxlen=100
 
 
 def check_for_changes() -> bool:
@@ -182,41 +238,54 @@ def check_for_changes() -> bool:
     changed = False
     current_mtimes = {}
 
-    for skill_dir in SKILLS_DIR.iterdir():
-        if skill_dir.is_dir():
+    if not SKILLS_DIR.exists():
+        return False
+
+    with _FILE_MTIMES_LOCK:
+        for skill_dir in SKILLS_DIR.iterdir():
+            if not skill_dir.is_dir():
+                continue
+
             for file in skill_dir.rglob("*"):
                 if file.is_file():
-                    mtime = file.stat().st_mtime
-                    current_mtimes[str(file)] = mtime
+                    try:
+                        mtime = file.stat().st_mtime
+                        current_mtimes[str(file)] = mtime
 
-                    if str(file) in _FILE_MTIMES:
-                        if _FILE_MTIMES[str(file)] != mtime:
+                        if str(file) in _FILE_MTIMES:
+                            if _FILE_MTIMES[str(file)] != mtime:
+                                changed = True
+                                logger.info(f"File changed: {file}")
+                        else:
+                            # New file
                             changed = True
-                            logger.info(f"File changed: {file}")
-                    else:
-                        # New file
-                        changed = True
+                    except (OSError, PermissionError) as e:
+                        logger.warning(f"Cannot access {file}: {e}")
+                        continue
 
-    # Check for deleted files
-    for old_file in _FILE_MTIMES:
-        if old_file not in current_mtimes:
-            changed = True
-            logger.info(f"File deleted: {old_file}")
+        # Check for deleted files
+        for old_file in _FILE_MTIMES:
+            if old_file not in current_mtimes:
+                changed = True
+                logger.info(f"File deleted: {old_file}")
 
-    _FILE_MTIMES = current_mtimes
+        _FILE_MTIMES = current_mtimes
+
     return changed
 
 
 def file_watcher():
     """Background thread to watch for file changes."""
-    global _INDEX, _CONTENT_INDEX
+    global _INDEX
 
     logger.info("File watcher started")
     while True:
         try:
             if check_for_changes():
                 logger.info("Changes detected, reloading index...")
-                _INDEX = load_index()
+                new_index = load_index()
+                with _INDEX_LOCK:
+                    _INDEX = new_index
         except Exception as e:
             logger.error(f"File watcher error: {e}")
 
@@ -247,20 +316,35 @@ def _list_skills() -> dict:
 
 def _get_skill(name: str) -> dict:
     """Load a skill's main SKILL.md content."""
+    # Validate skill name to prevent path traversal
+    if not is_safe_skill_name(name):
+        return {"error": f"Invalid skill name: {name}"}
+    
     track_usage("get_skill", {"domain": name})
 
     skill_dir = SKILLS_DIR / name
+    
+    # Validate resolved path is within SKILLS_DIR
+    if not validate_skill_path(skill_dir):
+        return {"error": f"Invalid skill path: {name}"}
+    
     skill_file = skill_dir / "SKILL.md"
 
     if not skill_file.exists():
         return {"error": f"Skill '{name}' not found"}
+
+    try:
+        content = skill_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        logger.error(f"Failed to read skill {name}: {e}")
+        return {"error": f"Failed to read skill: {e}"}
 
     index = get_index()
     meta = next((s for s in index["skills"] if s["name"] == name), {})
 
     return {
         "name": name,
-        "content": skill_file.read_text(encoding="utf-8"),
+        "content": content,
         "sub_skills": [sub["name"] for sub in meta.get("sub_skills", [])],
         "has_references": (skill_dir / "references").exists()
     }
@@ -268,6 +352,10 @@ def _get_skill(name: str) -> dict:
 
 def _get_sub_skill(domain: str, sub_skill: str) -> dict:
     """Load a specific sub-skill's content from a domain."""
+    # Validate domain name
+    if not is_safe_skill_name(domain):
+        return {"error": f"Invalid domain name: {domain}"}
+    
     track_usage("get_sub_skill", {"domain": domain, "sub_skill": sub_skill})
 
     index = get_index()
@@ -280,13 +368,25 @@ def _get_sub_skill(domain: str, sub_skill: str) -> dict:
         return {"error": f"Sub-skill '{sub_skill}' not found in '{domain}'"}
 
     file_path = SKILLS_DIR / domain / sub["file"]
+    
+    # Validate resolved path is within SKILLS_DIR
+    if not validate_skill_path(file_path):
+        logger.warning(f"Path traversal attempt detected: domain={domain}, file={sub['file']}")
+        return {"error": f"Invalid file path"}
+    
     if not file_path.exists():
         return {"error": f"File not found: {sub['file']}"}
+
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        logger.error(f"Failed to read sub-skill {domain}/{sub_skill}: {e}")
+        return {"error": f"Failed to read sub-skill: {e}"}
 
     return {
         "domain": domain,
         "sub_skill": sub_skill,
-        "content": file_path.read_text(encoding="utf-8")
+        "content": content
     }
 
 
@@ -309,6 +409,16 @@ def _get_skills_batch(requests: list[dict]) -> dict:
 
 def _search_skills(query: str, limit: int = 5) -> dict:
     """Search skills by keyword/phrase."""
+    # Validate query
+    if not query or not query.strip():
+        return {"error": "Query cannot be empty", "results": []}
+    
+    if len(query) > 1000:
+        return {"error": "Query too long (max 1000 characters)", "results": []}
+    
+    # Clamp limit to reasonable bounds
+    limit = max(1, min(limit, 100))
+    
     track_usage("search_skills", {"query": query})
 
     query_lower = query.lower()
@@ -364,54 +474,68 @@ def _search_skills(query: str, limit: int = 5) -> dict:
 
 def _search_content(query: str, limit: int = 10) -> dict:
     """Full-text search across all skill content."""
+    # Validate query
+    if not query or not query.strip():
+        return {"error": "Query cannot be empty", "results": []}
+    
+    if len(query) > 1000:
+        return {"error": "Query too long (max 1000 characters)", "results": []}
+    
+    query_words = query.lower().split()
+    if len(query_words) > 100:
+        return {"error": "Too many search terms (max 100 words)", "results": []}
+    
+    # Clamp limit to reasonable bounds
+    limit = max(1, min(limit, 100))
+    
     track_usage("search_content", {"query": query})
 
-    if _CONTENT_INDEX is None:
-        get_index()  # Ensure index is loaded
+    with _CONTENT_INDEX_LOCK:
+        if _CONTENT_INDEX is None:
+            get_index()  # Ensure index is loaded
 
-    query_lower = query.lower()
-    query_words = query_lower.split()
-    results = []
+        query_lower = query.lower()
+        results = []
 
-    for key, entry in _CONTENT_INDEX.items():
-        content = entry["content"]
+        for key, entry in _CONTENT_INDEX.items():
+            content = entry["content"]
 
-        # Calculate relevance score
-        score = 0
+            # Calculate relevance score
+            score = 0
 
-        # Exact phrase match (highest priority)
-        if query_lower in content:
-            score = 1.0
-            # Boost for matches in first 500 chars (likely headings/intro)
-            if query_lower in content[:500]:
-                score = 1.2
+            # Exact phrase match (highest priority)
+            if query_lower in content:
+                score = 1.0
+                # Boost for matches in first 500 chars (likely headings/intro)
+                if query_lower in content[:500]:
+                    score = 1.2
 
-        # All words present (medium priority)
-        elif all(word in content for word in query_words):
-            score = 0.7
-            matches = sum(content.count(word) for word in query_words)
-            score += min(matches * 0.05, 0.2)  # Bonus for frequency, capped
+            # All words present (medium priority)
+            elif all(word in content for word in query_words):
+                score = 0.7
+                matches = sum(content.count(word) for word in query_words)
+                score += min(matches * 0.05, 0.2)  # Bonus for frequency, capped
 
-        # Some words present (lower priority)
-        else:
-            matches = sum(1 for word in query_words if word in content)
-            if matches > 0:
-                score = 0.3 * (matches / len(query_words))
+            # Some words present (lower priority)
+            else:
+                matches = sum(1 for word in query_words if word in content)
+                if matches > 0:
+                    score = 0.3 * (matches / len(query_words))
 
-        if score > 0:
-            # Extract snippet around match
-            snippet = extract_snippet(content, query_lower, 150)
+            if score > 0:
+                # Extract snippet around match
+                snippet = extract_snippet(content, query_lower, 150)
 
-            results.append({
-                "domain": entry["domain"],
-                "sub_skill": entry["sub_skill"],
-                "file": entry["file"],
-                "score": round(score, 3),
-                "snippet": snippet
-            })
+                results.append({
+                    "domain": entry["domain"],
+                    "sub_skill": entry["sub_skill"],
+                    "file": entry["file"],
+                    "score": round(score, 3),
+                    "snippet": snippet
+                })
 
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return {"query": query, "results": results[:limit]}
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return {"query": query, "results": results[:limit]}
 
 
 def extract_snippet(content: str, query: str, max_length: int = 150) -> str:
@@ -443,26 +567,41 @@ def extract_snippet(content: str, query: str, max_length: int = 150) -> str:
 def _reload_index() -> dict:
     """Reload the skill index from disk."""
     global _INDEX
-    _INDEX = load_index()
+    new_index = load_index()
+    with _INDEX_LOCK:
+        _INDEX = new_index
     track_usage("reload_index")
+    
+    with _CONTENT_INDEX_LOCK:
+        content_count = len(_CONTENT_INDEX) if _CONTENT_INDEX else 0
+    
     return {
         "status": "reloaded",
         "skill_count": len(_INDEX["skills"]),
-        "content_files_indexed": len(_CONTENT_INDEX) if _CONTENT_INDEX else 0,
+        "content_files_indexed": content_count,
         "validation_errors": _INDEX.get("validation_errors", [])
     }
 
 
 def _get_stats() -> dict:
     """Get usage statistics."""
-    return {
-        "uptime_since": _USAGE_STATS["start_time"],
-        "tool_calls": _USAGE_STATS["tool_calls"],
-        "skill_loads": _USAGE_STATS["skill_loads"],
-        "recent_searches": _USAGE_STATS["searches"][-10:],
-        "total_skills": len(get_index()["skills"]),
-        "content_files_indexed": len(_CONTENT_INDEX) if _CONTENT_INDEX else 0
-    }
+    # Acquire locks in consistent order to avoid deadlock
+    with _STATS_LOCK:
+        stats_copy = {
+            "uptime_since": _USAGE_STATS["start_time"],
+            "tool_calls": _USAGE_STATS["tool_calls"].copy(),
+            "skill_loads": _USAGE_STATS["skill_loads"].copy(),
+            "recent_searches": list(_USAGE_STATS["searches"])[-10:],  # Last 10 searches
+        }
+    
+    # Get index info without holding stats lock
+    index = get_index()
+    stats_copy["total_skills"] = len(index["skills"])
+    
+    with _CONTENT_INDEX_LOCK:
+        stats_copy["content_files_indexed"] = len(_CONTENT_INDEX) if _CONTENT_INDEX else 0
+    
+    return stats_copy
 
 
 def _validate_skills() -> dict:
