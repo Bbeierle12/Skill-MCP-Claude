@@ -12,6 +12,7 @@ import re
 import shutil
 import base64
 from pathlib import Path
+from collections import defaultdict
 
 # Try to import Flask
 try:
@@ -41,6 +42,46 @@ SKILLS_DIR.mkdir(exist_ok=True)
 # Create Flask app
 app = Flask(__name__, static_folder=str(APP_DIR))
 CORS(app)
+
+
+# =============================================================================
+# Rate Limiting
+# =============================================================================
+
+class RateLimiter:
+    """Simple in-memory rate limiter using token bucket algorithm."""
+
+    def __init__(self, requests_per_second: float = 10.0, burst: int = 20):
+        self.rate = requests_per_second
+        self.burst = burst
+        self.tokens: dict = defaultdict(lambda: float(burst))
+        self.last_update: dict = defaultdict(time.time)
+        self.lock = threading.Lock()
+
+    def is_allowed(self, key: str = "global") -> bool:
+        with self.lock:
+            now = time.time()
+            elapsed = now - self.last_update[key]
+            self.last_update[key] = now
+            self.tokens[key] = min(self.burst, self.tokens[key] + elapsed * self.rate)
+            if self.tokens[key] >= 1.0:
+                self.tokens[key] -= 1.0
+                return True
+            return False
+
+
+rate_limiter = RateLimiter(requests_per_second=100.0, burst=200)
+
+
+@app.before_request
+def check_rate_limit():
+    """Apply rate limiting to all API requests."""
+    if request.path.startswith('/api/'):
+        client_ip = request.remote_addr or "unknown"
+        if not rate_limiter.is_allowed(client_ip):
+            return jsonify({"error": "Rate limit exceeded. Try again later."}), 429
+    return None
+
 
 def is_safe_skill_name(name: str) -> bool:
     """Validate that a skill name is safe for filesystem operations.

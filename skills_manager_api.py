@@ -12,6 +12,9 @@ import base64
 import binascii
 from datetime import datetime, timezone
 from typing import Any
+from collections import defaultdict
+import time
+import threading
 
 from creation_station_db import (
     connect,
@@ -38,6 +41,60 @@ RUN_TIMEOUT_SECONDS = int(os.environ.get("RUN_TIMEOUT_SECONDS", "180"))
 
 init_db()
 seed_skills_from_filesystem(SKILLS_DIR)
+
+
+# =============================================================================
+# Rate Limiting
+# =============================================================================
+
+class RateLimiter:
+    """Simple in-memory rate limiter using token bucket algorithm."""
+
+    def __init__(self, requests_per_second: float = 10.0, burst: int = 20):
+        """Initialize rate limiter.
+
+        Args:
+            requests_per_second: Steady-state rate limit
+            burst: Maximum burst size (bucket capacity)
+        """
+        self.rate = requests_per_second
+        self.burst = burst
+        self.tokens: dict[str, float] = defaultdict(lambda: float(burst))
+        self.last_update: dict[str, float] = defaultdict(time.time)
+        self.lock = threading.Lock()
+
+    def is_allowed(self, key: str = "global") -> bool:
+        """Check if request is allowed under rate limit."""
+        with self.lock:
+            now = time.time()
+            elapsed = now - self.last_update[key]
+            self.last_update[key] = now
+
+            # Add tokens based on elapsed time
+            self.tokens[key] = min(
+                self.burst,
+                self.tokens[key] + elapsed * self.rate
+            )
+
+            if self.tokens[key] >= 1.0:
+                self.tokens[key] -= 1.0
+                return True
+            return False
+
+
+# Global rate limiter: 100 requests/second with burst of 200
+rate_limiter = RateLimiter(requests_per_second=100.0, burst=200)
+
+
+@app.before_request
+def check_rate_limit():
+    """Apply rate limiting to all API requests."""
+    # Only rate limit API routes
+    if request.path.startswith('/api/'):
+        client_ip = request.remote_addr or "unknown"
+        if not rate_limiter.is_allowed(client_ip):
+            return jsonify({"error": "Rate limit exceeded. Try again later."}), 429
+    return None
 
 
 def utc_now() -> str:

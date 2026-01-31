@@ -1,4 +1,13 @@
 //! HTTP API server implementation using Axum.
+//!
+//! # Rate Limiting
+//!
+//! Rate limiting is recommended to be implemented at the infrastructure level
+//! (reverse proxy, load balancer, or API gateway) for production deployments.
+//! This provides better scalability and centralized configuration.
+//!
+//! For development or single-instance deployments, the Python API server
+//! includes built-in rate limiting (100 req/s per IP with burst of 200).
 
 use std::net::SocketAddr;
 use std::sync::Arc;
