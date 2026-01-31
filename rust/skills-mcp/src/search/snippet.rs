@@ -78,6 +78,7 @@ fn find_word_end(content: &str, pos: usize) -> usize {
 }
 
 /// Extract multiple snippets for a query with multiple terms.
+#[allow(dead_code)]
 pub fn extract_snippets(content: &str, terms: &[&str], context_chars: usize) -> Vec<String> {
     terms
         .iter()

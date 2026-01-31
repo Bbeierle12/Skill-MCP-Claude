@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::index::SkillIndexer;
 use crate::models::{SkillMeta, ValidationResult};

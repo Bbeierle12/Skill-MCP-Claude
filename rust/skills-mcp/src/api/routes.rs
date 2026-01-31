@@ -2,6 +2,7 @@
 //!
 //! These handlers correspond to the Flask routes in skills_manager_api.py.
 
+use std::path::Path as StdPath;
 use std::sync::Arc;
 
 use axum::{
@@ -11,9 +12,158 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use tokio::fs as async_fs;
 
 use crate::mcp::tools::ServiceContext;
 use crate::models::{ErrorResponse, SkillMeta};
+
+// ============================================================================
+// Path Traversal Protection
+// ============================================================================
+
+/// Maximum allowed skill name length
+const MAX_SKILL_NAME_LENGTH: usize = 100;
+
+/// Maximum allowed description length
+const MAX_DESCRIPTION_LENGTH: usize = 1000;
+
+/// Maximum allowed content length (1 MB)
+const MAX_CONTENT_LENGTH: usize = 1_000_000;
+
+/// Maximum number of tags per skill
+const MAX_TAGS_COUNT: usize = 20;
+
+/// Maximum length of each tag
+const MAX_TAG_LENGTH: usize = 50;
+
+/// Characters that are not allowed in skill names
+const FORBIDDEN_CHARS: &[char] = &['/', '\\', '\0', ':', '*', '?', '"', '<', '>', '|'];
+
+/// Validates that a skill name is safe and doesn't contain path traversal sequences.
+///
+/// Returns `Ok(())` if the name is valid, or an error response if not.
+fn validate_skill_name(name: &str) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    // Check for empty name
+    if name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new("Skill name cannot be empty".to_string())),
+        ));
+    }
+
+    // Check length
+    if name.len() > MAX_SKILL_NAME_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new(format!(
+                "Skill name too long (max {} characters)",
+                MAX_SKILL_NAME_LENGTH
+            ))),
+        ));
+    }
+
+    // Check for path traversal sequences
+    if name.contains("..") {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new(
+                "Skill name cannot contain '..'".to_string(),
+            )),
+        ));
+    }
+
+    // Check for forbidden characters
+    if name.chars().any(|c| FORBIDDEN_CHARS.contains(&c)) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new(
+                "Skill name contains invalid characters".to_string(),
+            )),
+        ));
+    }
+
+    // Check name doesn't start with a dot (hidden files)
+    if name.starts_with('.') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new(
+                "Skill name cannot start with '.'".to_string(),
+            )),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validates that a resolved path is within the skills directory.
+///
+/// This provides defense-in-depth against path traversal attacks.
+fn validate_skill_path(
+    skill_path: &StdPath,
+    skills_dir: &StdPath,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    // Canonicalize both paths to resolve any symlinks and relative components
+    let canonical_skills_dir = match skills_dir.canonicalize() {
+        Ok(p) => p,
+        Err(_) => {
+            // If skills_dir doesn't exist or can't be canonicalized, use it as-is
+            skills_dir.to_path_buf()
+        }
+    };
+
+    // For skill_path, it may not exist yet (for create operations)
+    // So we canonicalize the parent (skills_dir) and check the name component
+    let skill_name = match skill_path.file_name() {
+        Some(name) => name,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new("Invalid skill path".to_string())),
+            ));
+        }
+    };
+
+    // Build expected path from canonical skills dir
+    let expected_path = canonical_skills_dir.join(skill_name);
+
+    // If the skill path exists, canonicalize it and compare
+    if skill_path.exists() {
+        let canonical_skill_path = match skill_path.canonicalize() {
+            Ok(p) => p,
+            Err(e) => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse::new(format!(
+                        "Failed to resolve skill path: {}",
+                        e
+                    ))),
+                ));
+            }
+        };
+
+        // Ensure the canonical path starts with the skills directory
+        if !canonical_skill_path.starts_with(&canonical_skills_dir) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new(
+                    "Skill path is outside skills directory".to_string(),
+                )),
+            ));
+        }
+    } else {
+        // For paths that don't exist yet, verify the constructed path matches
+        if skill_path != expected_path {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new(
+                    "Invalid skill path construction".to_string(),
+                )),
+            ));
+        }
+    }
+
+    Ok(())
+}
 
 /// Application state shared across routes.
 pub type AppState = Arc<ServiceContext>;
@@ -82,6 +232,9 @@ pub async fn get_skill(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<Json<SkillDetails>, (StatusCode, Json<ErrorResponse>)> {
+    // Validate skill name to prevent path traversal
+    validate_skill_name(&name)?;
+
     let meta = state
         .indexer
         .get_skill_meta(&name)
@@ -139,10 +292,75 @@ pub struct CreateSkillRequest {
     pub tags: Vec<String>,
 }
 
+impl CreateSkillRequest {
+    /// Validate the request fields.
+    fn validate(&self) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+        // Validate description length
+        if self.description.len() > MAX_DESCRIPTION_LENGTH {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new(format!(
+                    "Description too long (max {} characters)",
+                    MAX_DESCRIPTION_LENGTH
+                ))),
+            ));
+        }
+
+        // Validate content length
+        if self.content.len() > MAX_CONTENT_LENGTH {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new(format!(
+                    "Content too long (max {} bytes)",
+                    MAX_CONTENT_LENGTH
+                ))),
+            ));
+        }
+
+        // Validate tags count
+        if self.tags.len() > MAX_TAGS_COUNT {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse::new(format!(
+                    "Too many tags (max {})",
+                    MAX_TAGS_COUNT
+                ))),
+            ));
+        }
+
+        // Validate individual tag lengths
+        for tag in &self.tags {
+            if tag.len() > MAX_TAG_LENGTH {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse::new(format!(
+                        "Tag '{}' too long (max {} characters)",
+                        tag, MAX_TAG_LENGTH
+                    ))),
+                ));
+            }
+            if tag.is_empty() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse::new("Tags cannot be empty".to_string())),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 pub async fn create_skill(
     State(state): State<AppState>,
     Json(req): Json<CreateSkillRequest>,
 ) -> Result<(StatusCode, Json<SkillDetails>), (StatusCode, Json<ErrorResponse>)> {
+    // Validate skill name to prevent path traversal
+    validate_skill_name(&req.name)?;
+
+    // Validate request fields
+    req.validate()?;
+
     // Check if skill already exists
     if state.indexer.skill_exists(&req.name) {
         return Err((
@@ -158,7 +376,10 @@ pub async fn create_skill(
     let skills_dir = state.indexer.skills_dir();
     let skill_dir = skills_dir.join(&req.name);
 
-    std::fs::create_dir_all(&skill_dir).map_err(|e| {
+    // Validate the constructed path is within skills directory
+    validate_skill_path(&skill_dir, skills_dir)?;
+
+    async_fs::create_dir_all(&skill_dir).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to create directory: {}", e))),
@@ -181,7 +402,7 @@ pub async fn create_skill(
         )
     })?;
 
-    std::fs::write(skill_dir.join("_meta.json"), meta_json).map_err(|e| {
+    async_fs::write(skill_dir.join("_meta.json"), meta_json).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to write _meta.json: {}", e))),
@@ -189,7 +410,7 @@ pub async fn create_skill(
     })?;
 
     // Create SKILL.md
-    std::fs::write(skill_dir.join("SKILL.md"), &req.content).map_err(|e| {
+    async_fs::write(skill_dir.join("SKILL.md"), &req.content).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to write SKILL.md: {}", e))),
@@ -231,13 +452,86 @@ pub struct UpdateSkillRequest {
     pub tags: Option<Vec<String>>,
 }
 
+impl UpdateSkillRequest {
+    /// Validate the request fields.
+    fn validate(&self) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+        // Validate description length if provided
+        if let Some(ref desc) = self.description {
+            if desc.len() > MAX_DESCRIPTION_LENGTH {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse::new(format!(
+                        "Description too long (max {} characters)",
+                        MAX_DESCRIPTION_LENGTH
+                    ))),
+                ));
+            }
+        }
+
+        // Validate content length if provided
+        if let Some(ref content) = self.content {
+            if content.len() > MAX_CONTENT_LENGTH {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse::new(format!(
+                        "Content too long (max {} bytes)",
+                        MAX_CONTENT_LENGTH
+                    ))),
+                ));
+            }
+        }
+
+        // Validate tags if provided
+        if let Some(ref tags) = self.tags {
+            if tags.len() > MAX_TAGS_COUNT {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse::new(format!(
+                        "Too many tags (max {})",
+                        MAX_TAGS_COUNT
+                    ))),
+                ));
+            }
+
+            for tag in tags {
+                if tag.len() > MAX_TAG_LENGTH {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        Json(ErrorResponse::new(format!(
+                            "Tag '{}' too long (max {} characters)",
+                            tag, MAX_TAG_LENGTH
+                        ))),
+                    ));
+                }
+                if tag.is_empty() {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        Json(ErrorResponse::new("Tags cannot be empty".to_string())),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 pub async fn update_skill(
     State(state): State<AppState>,
     Path(name): Path<String>,
     Json(req): Json<UpdateSkillRequest>,
 ) -> Result<Json<SkillDetails>, (StatusCode, Json<ErrorResponse>)> {
+    // Validate skill name to prevent path traversal
+    validate_skill_name(&name)?;
+
+    // Validate request fields
+    req.validate()?;
+
     let skills_dir = state.indexer.skills_dir();
     let skill_dir = skills_dir.join(&name);
+
+    // Validate the constructed path is within skills directory
+    validate_skill_path(&skill_dir, skills_dir)?;
 
     if !skill_dir.exists() {
         return Err((
@@ -248,7 +542,7 @@ pub async fn update_skill(
 
     // Load existing meta
     let meta_path = skill_dir.join("_meta.json");
-    let meta_content = std::fs::read_to_string(&meta_path).map_err(|e| {
+    let meta_content = async_fs::read_to_string(&meta_path).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to read _meta.json: {}", e))),
@@ -272,7 +566,7 @@ pub async fn update_skill(
 
     // Save updated meta
     let meta_json = serde_json::to_string_pretty(&meta).unwrap();
-    std::fs::write(&meta_path, meta_json).map_err(|e| {
+    async_fs::write(&meta_path, meta_json).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to write _meta.json: {}", e))),
@@ -281,7 +575,7 @@ pub async fn update_skill(
 
     // Update content if provided
     let content = if let Some(new_content) = req.content {
-        std::fs::write(skill_dir.join("SKILL.md"), &new_content).map_err(|e| {
+        async_fs::write(skill_dir.join("SKILL.md"), &new_content).await.map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse::new(format!("Failed to write SKILL.md: {}", e))),
@@ -289,7 +583,7 @@ pub async fn update_skill(
         })?;
         new_content
     } else {
-        std::fs::read_to_string(skill_dir.join("SKILL.md")).unwrap_or_default()
+        async_fs::read_to_string(skill_dir.join("SKILL.md")).await.unwrap_or_default()
     };
 
     // Reload index
@@ -327,8 +621,14 @@ pub async fn delete_skill(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    // Validate skill name to prevent path traversal
+    validate_skill_name(&name)?;
+
     let skills_dir = state.indexer.skills_dir();
     let skill_dir = skills_dir.join(&name);
+
+    // Validate the constructed path is within skills directory
+    validate_skill_path(&skill_dir, skills_dir)?;
 
     if !skill_dir.exists() {
         return Err((
@@ -337,7 +637,7 @@ pub async fn delete_skill(
         ));
     }
 
-    std::fs::remove_dir_all(&skill_dir).map_err(|e| {
+    async_fs::remove_dir_all(&skill_dir).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse::new(format!("Failed to delete skill: {}", e))),
@@ -380,6 +680,12 @@ pub async fn reload_index(State(state): State<AppState>) -> impl IntoResponse {
 // GET /api/search - Search skills
 // ============================================================================
 
+/// Maximum allowed search query length
+const MAX_SEARCH_QUERY_LENGTH: usize = 1000;
+
+/// Maximum allowed search limit
+const MAX_SEARCH_LIMIT: usize = 100;
+
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
     pub q: String,
@@ -394,11 +700,32 @@ fn default_limit() -> usize {
 pub async fn search_skills(
     State(state): State<AppState>,
     axum::extract::Query(query): axum::extract::Query<SearchQuery>,
-) -> impl IntoResponse {
+) -> Result<Json<crate::models::SearchResults>, (StatusCode, Json<ErrorResponse>)> {
     use crate::models::SearchOptions;
 
-    let options = SearchOptions::with_limit(query.limit);
+    // Validate query length
+    if query.q.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new("Search query cannot be empty".to_string())),
+        ));
+    }
+
+    if query.q.len() > MAX_SEARCH_QUERY_LENGTH {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse::new(format!(
+                "Search query too long (max {} characters)",
+                MAX_SEARCH_QUERY_LENGTH
+            ))),
+        ));
+    }
+
+    // Clamp limit to valid range
+    let limit = query.limit.clamp(1, MAX_SEARCH_LIMIT);
+
+    let options = SearchOptions::with_limit(limit);
     let results = state.search.search_skills(&query.q, options);
 
-    Json(results)
+    Ok(Json(results))
 }

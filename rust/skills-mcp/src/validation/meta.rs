@@ -74,8 +74,11 @@ pub fn validate_meta(meta: &SkillMeta) -> Result<(), Vec<String>> {
 
 /// Validation result with additional context.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ValidationError {
+    /// The field that failed validation.
     pub field: String,
+    /// The validation error message.
     pub message: String,
 }
 

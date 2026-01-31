@@ -111,7 +111,12 @@ pub enum BatchResponseItem {
     /// Sub-skill content.
     SubSkill(SubSkillContent),
     /// Error loading content.
-    Error { domain: String, error: String },
+    Error {
+        /// The skill domain that failed to load.
+        domain: String,
+        /// The error message describing what went wrong.
+        error: String,
+    },
 }
 
 impl BatchResponseItem {

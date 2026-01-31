@@ -14,8 +14,11 @@ use crate::validation::validate_skills;
 
 /// Service context shared across all tool handlers.
 pub struct ServiceContext {
+    /// The skill indexer for loading skill metadata and content.
     pub indexer: Arc<SkillIndexer>,
+    /// The search service for querying skills.
     pub search: SearchService,
+    /// Usage statistics tracker.
     pub stats: Arc<parking_lot::RwLock<UsageStats>>,
 }
 
@@ -50,16 +53,22 @@ impl ServiceContext {
 /// Response for list_skills tool.
 #[derive(Debug, Serialize)]
 pub struct ListSkillsResponse {
+    /// List of skill summaries.
     pub skills: Vec<SkillSummary>,
+    /// Total number of skills.
     pub total: usize,
 }
 
 /// Summary info for a skill.
 #[derive(Debug, Serialize)]
 pub struct SkillSummary {
+    /// Skill name/identifier.
     pub name: String,
+    /// Short description of the skill.
     pub description: String,
+    /// Tags for categorization.
     pub tags: Vec<String>,
+    /// Names of sub-skills within this skill.
     pub sub_skills: Vec<String>,
 }
 
@@ -92,6 +101,7 @@ pub fn list_skills(ctx: &ServiceContext) -> ListSkillsResponse {
 /// Request for get_skill tool.
 #[derive(Debug, Deserialize)]
 pub struct GetSkillRequest {
+    /// Name of the skill to retrieve.
     pub name: String,
 }
 
@@ -112,7 +122,9 @@ pub fn get_skill(ctx: &ServiceContext, req: GetSkillRequest) -> Result<SkillCont
 /// Request for get_sub_skill tool.
 #[derive(Debug, Deserialize)]
 pub struct GetSubSkillRequest {
+    /// Parent skill domain name.
     pub domain: String,
+    /// Name of the sub-skill to retrieve.
     pub sub_skill: String,
 }
 
@@ -136,12 +148,14 @@ pub fn get_sub_skill(
 /// Request for get_skills_batch tool.
 #[derive(Debug, Deserialize)]
 pub struct GetSkillsBatchRequest {
+    /// List of skill/sub-skill requests to process.
     pub requests: Vec<BatchRequest>,
 }
 
 /// Response for get_skills_batch tool.
 #[derive(Debug, Serialize)]
 pub struct GetSkillsBatchResponse {
+    /// Results for each requested skill.
     pub results: Vec<BatchResponseItem>,
 }
 
@@ -181,7 +195,9 @@ pub fn get_skills_batch(ctx: &ServiceContext, req: GetSkillsBatchRequest) -> Get
 /// Request for search_skills tool.
 #[derive(Debug, Deserialize)]
 pub struct SearchSkillsRequest {
+    /// Search query string.
     pub query: String,
+    /// Maximum number of results to return.
     #[serde(default)]
     pub limit: Option<usize>,
 }
@@ -211,7 +227,9 @@ pub fn search_skills(ctx: &ServiceContext, req: SearchSkillsRequest) -> SearchRe
 /// Request for search_content tool.
 #[derive(Debug, Deserialize)]
 pub struct SearchContentRequest {
+    /// Search query string for full-text search.
     pub query: String,
+    /// Maximum number of results to return.
     #[serde(default)]
     pub limit: Option<usize>,
 }
@@ -241,9 +259,13 @@ pub fn search_content(ctx: &ServiceContext, req: SearchContentRequest) -> Search
 /// Response for reload_index tool.
 #[derive(Debug, Serialize)]
 pub struct ReloadIndexResponse {
+    /// Whether the reload succeeded.
     pub success: bool,
+    /// Number of skills in the index after reload.
     pub skill_count: usize,
+    /// Number of content entries in the index after reload.
     pub content_entries: usize,
+    /// Error message if reload failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }

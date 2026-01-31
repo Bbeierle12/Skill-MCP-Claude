@@ -42,8 +42,125 @@ SKILLS_DIR.mkdir(exist_ok=True)
 app = Flask(__name__, static_folder=str(APP_DIR))
 CORS(app)
 
+def is_safe_skill_name(name: str) -> bool:
+    """Validate that a skill name is safe for filesystem operations.
+
+    Only allows alphanumeric characters, hyphens, and underscores.
+    Rejects path traversal attempts like '..' or names starting with '.'.
+    """
+    if not name or not isinstance(name, str):
+        return False
+    # Reject path traversal attempts
+    if '..' in name or name.startswith('.'):
+        return False
+    # Only allow alphanumeric, hyphens, and underscores
+    return bool(re.match(r'^[a-zA-Z0-9\-_]+$', name))
+
+
+def validate_skill_path(skill_path: Path) -> bool:
+    """Validate that a resolved path is within SKILLS_DIR.
+
+    This provides defense-in-depth against path traversal attacks.
+    """
+    try:
+        resolved_path = skill_path.resolve()
+        skills_dir_resolved = SKILLS_DIR.resolve()
+        return str(resolved_path).startswith(str(skills_dir_resolved))
+    except (OSError, ValueError):
+        return False
+
+
 def sanitize_name(name: str) -> str:
     return re.sub(r'[^a-z0-9-]', '-', name.lower().strip()).strip('-')
+
+
+def escape_yaml_value(value: str) -> str:
+    """Escape a string value for safe inclusion in YAML frontmatter.
+
+    Handles special characters that could break YAML parsing:
+    - Colons, which indicate key-value pairs
+    - Newlines, which would break the structure
+    - Quotes, which need escaping inside quoted strings
+    - Leading/trailing spaces
+    """
+    if not value:
+        return '""'
+
+    # Check if value needs quoting
+    needs_quoting = (
+        ':' in value or
+        '\n' in value or
+        '\r' in value or
+        '"' in value or
+        "'" in value or
+        '#' in value or
+        value.startswith(' ') or
+        value.endswith(' ') or
+        value.startswith('[') or
+        value.startswith('{') or
+        value.lower() in ('true', 'false', 'null', 'yes', 'no', 'on', 'off')
+    )
+
+    if not needs_quoting:
+        return value
+
+    # Use double quotes and escape special characters
+    escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+    escaped = escaped.replace('\n', '\\n').replace('\r', '\\r')
+    return f'"{escaped}"'
+
+
+# File upload validation constants
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB per file
+MAX_TOTAL_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB total
+MAX_FILES_PER_UPLOAD = 100
+MAX_PATH_DEPTH = 10
+MAX_FILENAME_LENGTH = 255
+
+ALLOWED_EXTENSIONS = {
+    '.md', '.markdown', '.txt', '.rst', '.adoc',
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.rs', '.go', '.rb', '.java',
+    '.c', '.cpp', '.h', '.hpp', '.cs', '.swift', '.kt', '.scala',
+    '.sh', '.bash', '.zsh', '.ps1', '.bat', '.cmd',
+    '.json', '.yaml', '.yml', '.toml', '.xml', '.ini', '.cfg', '.conf',
+    '.html', '.htm', '.css', '.scss', '.sass', '.less',
+    '.csv', '.sql',
+    '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico',
+    '.bin', '.dat', '.wasm',
+}
+
+
+def validate_upload_path(file_path: str) -> tuple:
+    """Validate an uploaded file path for security issues."""
+    if not file_path:
+        return False, "Empty file path"
+
+    normalized = file_path.replace("\\", "/")
+
+    if ".." in normalized:
+        return False, "Path traversal detected"
+
+    if normalized.startswith("/") or (len(normalized) >= 2 and normalized[1] == ":"):
+        return False, "Absolute paths not allowed"
+
+    parts = [p for p in normalized.split("/") if p]
+    if len(parts) > MAX_PATH_DEPTH:
+        return False, f"Path too deep (max {MAX_PATH_DEPTH} levels)"
+
+    filename = parts[-1] if parts else ""
+    if len(filename) > MAX_FILENAME_LENGTH:
+        return False, f"Filename too long (max {MAX_FILENAME_LENGTH} chars)"
+
+    if '.' in filename:
+        ext = '.' + filename.rsplit('.', 1)[-1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            return False, f"File extension '{ext}' not allowed"
+
+    if any(ord(c) < 32 for c in file_path):
+        return False, "Invalid characters in path"
+
+    return True, ""
+
 
 def find_claude_cli():
     possible_paths = [
@@ -74,7 +191,8 @@ def list_skills():
                 if meta_file.exists():
                     try:
                         skill_data.update(json.loads(meta_file.read_text(encoding="utf-8")))
-                    except: pass
+                    except (json.JSONDecodeError, OSError):
+                        pass
                 skill_file = skill_dir / "SKILL.md"
                 if skill_file.exists():
                     content = skill_file.read_text(encoding="utf-8")
@@ -86,7 +204,8 @@ def list_skills():
                                 if line.startswith("description:"):
                                     skill_data["description"] = line.split(":", 1)[1].strip()
                                     break
-                        except: pass
+                        except ValueError:
+                            pass
                 skill_data["has_scripts"] = (skill_dir / "scripts").exists()
                 skill_data["has_references"] = (skill_dir / "references").exists()
                 skill_data["file_count"] = len(list(skill_dir.rglob("*")))
@@ -95,7 +214,16 @@ def list_skills():
 
 @app.route('/api/skills/<name>', methods=['GET'])
 def get_skill(name):
+    # Validate skill name to prevent path traversal
+    if not is_safe_skill_name(name):
+        return jsonify({"error": f"Invalid skill name: {name}"}), 400
+
     skill_dir = SKILLS_DIR / name
+
+    # Validate the constructed path is within SKILLS_DIR
+    if not validate_skill_path(skill_dir):
+        return jsonify({"error": f"Invalid skill path: {name}"}), 400
+
     if not skill_dir.exists():
         return jsonify({"error": f"Skill '{name}' not found"}), 404
     skill_data = {"name": name, "files": []}
@@ -122,20 +250,33 @@ def create_skill():
     skill_dir.mkdir(parents=True, exist_ok=True)
     description = data.get("description", "")
     content = data.get("content", "")
-    (skill_dir / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\n---\n\n{content}", encoding="utf-8")
+    escaped_name = escape_yaml_value(name)
+    escaped_desc = escape_yaml_value(description)
+    (skill_dir / "SKILL.md").write_text(f"---\nname: {escaped_name}\ndescription: {escaped_desc}\n---\n\n{content}", encoding="utf-8")
     meta = {"name": name, "description": description, "tags": data.get("tags", []), "sub_skills": [], "source": "imported"}
     (skill_dir / "_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return jsonify({"success": True, "name": name, "path": str(skill_dir)})
 
 @app.route('/api/skills/<name>', methods=['PUT'])
 def update_skill(name):
+    # Validate skill name to prevent path traversal
+    if not is_safe_skill_name(name):
+        return jsonify({"error": f"Invalid skill name: {name}"}), 400
+
     skill_dir = SKILLS_DIR / name
+
+    # Validate the constructed path is within SKILLS_DIR
+    if not validate_skill_path(skill_dir):
+        return jsonify({"error": f"Invalid skill path: {name}"}), 400
+
     if not skill_dir.exists():
         return jsonify({"error": f"Skill '{name}' not found"}), 404
     data = request.json
     description = data.get("description", "")
     content = data.get("content", "")
-    (skill_dir / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\n---\n\n{content}", encoding="utf-8")
+    escaped_name = escape_yaml_value(name)
+    escaped_desc = escape_yaml_value(description)
+    (skill_dir / "SKILL.md").write_text(f"---\nname: {escaped_name}\ndescription: {escaped_desc}\n---\n\n{content}", encoding="utf-8")
     meta_file = skill_dir / "_meta.json"
     meta = json.loads(meta_file.read_text(encoding="utf-8")) if meta_file.exists() else {}
     meta.update({"name": name, "description": description, "tags": data.get("tags", meta.get("tags", []))})
@@ -144,7 +285,16 @@ def update_skill(name):
 
 @app.route('/api/skills/<name>', methods=['DELETE'])
 def delete_skill(name):
+    # Validate skill name to prevent path traversal
+    if not is_safe_skill_name(name):
+        return jsonify({"error": f"Invalid skill name: {name}"}), 400
+
     skill_dir = SKILLS_DIR / name
+
+    # Validate the constructed path is within SKILLS_DIR
+    if not validate_skill_path(skill_dir):
+        return jsonify({"error": f"Invalid skill path: {name}"}), 400
+
     if not skill_dir.exists():
         return jsonify({"error": f"Skill '{name}' not found"}), 404
     shutil.rmtree(skill_dir)
@@ -166,7 +316,8 @@ def import_folder():
     try:
         shutil.copytree(source, dest)
         if not (dest / "SKILL.md").exists():
-            (dest / "SKILL.md").write_text(f"---\nname: {skill_name}\ndescription: Imported\n---\n\n# {skill_name}", encoding="utf-8")
+            escaped_name = escape_yaml_value(skill_name)
+            (dest / "SKILL.md").write_text(f"---\nname: {escaped_name}\ndescription: Imported\n---\n\n# {skill_name}", encoding="utf-8")
         if not (dest / "_meta.json").exists():
             (dest / "_meta.json").write_text(json.dumps({"name": skill_name, "description": "Imported", "tags": [], "sub_skills": []}, indent=2), encoding="utf-8")
         return jsonify({"success": True, "name": skill_name, "path": str(dest), "files_imported": len(list(dest.rglob("*")))})
@@ -178,24 +329,58 @@ def import_folder():
 def import_files_json():
     data = request.json
     skill_name = sanitize_name(data.get("skill_name", ""))
+    files = data.get("files", [])
+
     if not skill_name:
         return jsonify({"error": "Skill name required"}), 400
+
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        return jsonify({"error": f"Too many files (max {MAX_FILES_PER_UPLOAD})"}), 400
+
     skill_dir = SKILLS_DIR / skill_name
     skill_dir.mkdir(parents=True, exist_ok=True)
+
     imported = []
-    for f in data.get("files", []):
+    skipped = []
+    total_size = 0
+
+    for f in files:
         file_path = f.get("path", "")
-        if not file_path or ".." in file_path: continue
+        content = f.get("content", "")
+        is_base64 = f.get("base64", False)
+
+        is_valid, error_msg = validate_upload_path(file_path)
+        if not is_valid:
+            skipped.append({"file": file_path, "reason": error_msg})
+            continue
+
+        content_size = len(content) * 3 // 4 if is_base64 else len(content.encode('utf-8'))
+
+        if content_size > MAX_FILE_SIZE_BYTES:
+            skipped.append({"file": file_path, "reason": "File too large"})
+            continue
+
+        total_size += content_size
+        if total_size > MAX_TOTAL_UPLOAD_BYTES:
+            skipped.append({"file": file_path, "reason": "Total upload size exceeded"})
+            continue
+
         dest_path = skill_dir / file_path.replace("\\", "/")
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        if f.get("base64"):
-            dest_path.write_bytes(base64.b64decode(f.get("content", "")))
-        else:
-            dest_path.write_text(f.get("content", ""), encoding="utf-8")
-        imported.append(file_path)
+
+        try:
+            if is_base64:
+                dest_path.write_bytes(base64.b64decode(content))
+            else:
+                dest_path.write_text(content, encoding="utf-8")
+            imported.append(file_path)
+        except Exception:
+            skipped.append({"file": file_path, "reason": "Write failed"})
+
     if not (skill_dir / "_meta.json").exists():
         (skill_dir / "_meta.json").write_text(json.dumps({"name": skill_name, "description": "Imported", "tags": [], "sub_skills": []}, indent=2), encoding="utf-8")
-    return jsonify({"success": True, "name": skill_name, "files_imported": imported})
+
+    return jsonify({"success": True, "name": skill_name, "files_imported": imported, "skipped": skipped})
 
 @app.route('/api/browse', methods=['GET'])
 def browse_filesystem():
@@ -228,7 +413,8 @@ def claude_status():
         try:
             result = subprocess.run([cli, '--version'], capture_output=True, text=True, timeout=5)
             return jsonify({"available": True, "path": cli, "version": result.stdout.strip() or result.stderr.strip()})
-        except: pass
+        except (subprocess.TimeoutExpired, OSError, subprocess.SubprocessError):
+            pass
     return jsonify({"available": False, "error": "Claude CLI not found"})
 
 @app.route('/api/claude/run', methods=['POST'])
@@ -280,7 +466,8 @@ Only output SKILL.md content."""
                 for line in output[3:end].split("\n"):
                     if line.startswith("name:"): skill_data["name"] = line.split(":", 1)[1].strip()
                     elif line.startswith("description:"): skill_data["description"] = line.split(":", 1)[1].strip()
-            except: pass
+            except ValueError:
+                pass
         return jsonify({"success": True, "skill": skill_data})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timeout"}), 408

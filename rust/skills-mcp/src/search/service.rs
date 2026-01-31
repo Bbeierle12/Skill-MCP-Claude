@@ -5,9 +5,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::index::SkillIndexer;
-use crate::models::{
-    ContentIndex, MatchType, SearchOptions, SearchResult, SearchResults, SkillIndex, SkillMeta,
-};
+use crate::models::{MatchType, SearchOptions, SearchResult, SearchResults, SkillMeta};
 
 use super::extract_snippet;
 
