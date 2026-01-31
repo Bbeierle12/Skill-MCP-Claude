@@ -142,6 +142,56 @@
       <p class="text-yellow-300 font-medium">API Server Not Running</p>
       <p class="text-yellow-400/70 text-sm">Start: <code class="bg-gray-800 px-2 py-0.5 rounded">python skills_manager_api.py</code></p>
     </div>
+
+    <!-- Test Lab -->
+    <section class="mt-10 bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold flex items-center gap-2">
+          <i data-lucide="flask-conical" class="w-5 h-5 text-purple-400"></i>
+          Test Lab
+        </h2>
+        <span class="text-xs text-gray-400">Run prompts with skill context, collect feedback, and save test cases.</span>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 space-y-3">
+          <textarea id="testLabPrompt" rows="6" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500" placeholder="Enter your test prompt..."></textarea>
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="testLabSkillSelect" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1" onchange="updateTestLabVersions()">
+              <option value="">No skill context</option>
+            </select>
+            <select id="testLabVersionSelect" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1">
+              <option value="">Published (filesystem)</option>
+            </select>
+            <label class="flex items-center gap-2 text-sm text-gray-400">
+              <input type="checkbox" id="testLabIncludeRefs" class="rounded border-gray-600 bg-gray-900">
+              Include references
+            </label>
+            <button onclick="runTestLab()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm flex items-center gap-2">
+              <i data-lucide="play" class="w-4 h-4"></i> Run
+            </button>
+          </div>
+          <div id="testLabOutput" class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 min-h-[140px] whitespace-pre-wrap">Run output will appear here...</div>
+        </div>
+        <div class="space-y-3">
+          <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 space-y-3">
+            <div class="text-sm font-medium text-gray-200">Feedback</div>
+            <div class="flex gap-2">
+              <button onclick="setTestLabRating('helpful')" class="px-3 py-1 rounded-lg bg-green-600/20 text-green-300 text-xs">Helpful</button>
+              <button onclick="setTestLabRating('partial')" class="px-3 py-1 rounded-lg bg-yellow-600/20 text-yellow-300 text-xs">Partial</button>
+              <button onclick="setTestLabRating('wrong')" class="px-3 py-1 rounded-lg bg-red-600/20 text-red-300 text-xs">Wrong</button>
+            </div>
+            <input id="testLabTags" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Tags (comma-separated)">
+            <textarea id="testLabComment" rows="4" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Add a comment..."></textarea>
+            <button onclick="submitTestLabFeedback()" class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm">Submit Feedback</button>
+          </div>
+          <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 space-y-3">
+            <div class="text-sm font-medium text-gray-200">Save as Test Case</div>
+            <input id="testLabCaseTitle" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Test case title">
+            <button onclick="createTestCaseFromRun()" class="w-full px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm">Create Test Case</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Import/Create Modal -->
@@ -417,6 +467,8 @@
     let generatedSkillData = null;
     let selectedFolderPath = null;
     let selectedFiles = [];
+    let currentRunId = null;
+    let testLabRating = null;
     
     // Store paths safely to avoid escaping issues
     let browsePathCache = {};
@@ -468,11 +520,12 @@
 
     async function loadSkillsFromAPI() {
       try {
-        const res = await fetch(`${API_BASE}/api/skills`);
+        const res = await fetch(`${API_BASE}/api/skills?include_content=0`);
         const data = await res.json();
         skills = data.skills.map(s => ({ ...s, category: inferCategory(s), tags: s.tags || [] }));
         saveSkillsToStorage();
         updateConsoleSkillSelect();
+        populateTestLabSkills();
       } catch (e) { loadSkillsFromStorage(); }
     }
 
@@ -486,10 +539,21 @@
       return 'other';
     }
 
-    function loadSkillsFromStorage() { const s = localStorage.getItem('mcp-skills-cache'); if (s) skills = JSON.parse(s); }
+    function loadSkillsFromStorage() {
+      const s = localStorage.getItem('mcp-skills-cache');
+      if (s) skills = JSON.parse(s);
+      populateTestLabSkills();
+    }
     function saveSkillsToStorage() { localStorage.setItem('mcp-skills-cache', JSON.stringify(skills)); }
     function updateConsoleSkillSelect() {
       document.getElementById('consoleSkillSelect').innerHTML = '<option value="">No skill context</option>' + skills.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    }
+
+    function populateTestLabSkills() {
+      const select = document.getElementById('testLabSkillSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="">No skill context</option>' + skills.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+      updateTestLabVersions();
     }
 
     function renderSkills() {
@@ -593,8 +657,25 @@
       } catch (e) { showToast('Error', 'error'); }
     }
 
-    function editSkill(name) {
+    async function fetchSkillContent(name) {
       const skill = skills.find(s => s.name === name);
+      if (skill && skill.content) return skill;
+      try {
+        const res = await fetch(`${API_BASE}/api/skills/${name}?include_content=1`);
+        if (!res.ok) return skill;
+        const data = await res.json();
+        if (skill) {
+          skill.content = data.content;
+          return skill;
+        }
+        return data;
+      } catch (e) {
+        return skill;
+      }
+    }
+
+    async function editSkill(name) {
+      const skill = await fetchSkillContent(name);
       if (!skill) return;
       editingSkill = name;
       document.getElementById('modalTitle').textContent = 'Edit Skill';
@@ -648,7 +729,7 @@
         
         if (data.success) {
           showToast(`Imported "${data.name}" (${data.files_imported.length} files)`, 'success');
-          loadSkills();
+          loadSkillsFromAPI();
         } else {
           showToast(data.error || 'Import failed', 'error');
         }
@@ -974,8 +1055,8 @@
     }
 
     // === View/Console ===
-    function viewSkill(name) {
-      const skill = skills.find(s => s.name === name);
+    async function viewSkill(name) {
+      const skill = await fetchSkillContent(name);
       if (!skill) return;
       currentViewSkill = name;
       document.getElementById('viewModalTitle').innerHTML = `<i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i><span>${skill.name}</span>`;
@@ -1006,7 +1087,10 @@
 
       try {
         let skillContext = '';
-        if (skillName) { const skill = skills.find(s => s.name === skillName); if (skill) skillContext = skill.content || ''; }
+        if (skillName) {
+          const skill = await fetchSkillContent(skillName);
+          if (skill) skillContext = skill.content || '';
+        }
         const res = await fetch(`${API_BASE}/api/claude/run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1024,6 +1108,118 @@
       output.scrollTop = output.scrollHeight;
     }
 
+    async function updateTestLabVersions() {
+      const skillName = document.getElementById('testLabSkillSelect').value;
+      const versionSelect = document.getElementById('testLabVersionSelect');
+      if (!skillName) {
+        versionSelect.innerHTML = '<option value="">Published (filesystem)</option>';
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/skills/${skillName}/versions`);
+        const data = await res.json();
+        if (data.versions) {
+          versionSelect.innerHTML = '<option value="">Published (filesystem)</option>' +
+            data.versions.map(v => `<option value="${v.id}">v${v.version_number} · ${v.status}</option>`).join('');
+        }
+      } catch (e) {
+        versionSelect.innerHTML = '<option value="">Published (filesystem)</option>';
+      }
+    }
+
+    async function runTestLab() {
+      const prompt = document.getElementById('testLabPrompt').value.trim();
+      if (!prompt) { showToast('Enter a prompt', 'error'); return; }
+      const skillName = document.getElementById('testLabSkillSelect').value;
+      const versionId = document.getElementById('testLabVersionSelect').value;
+      const includeRefs = document.getElementById('testLabIncludeRefs').checked;
+      const output = document.getElementById('testLabOutput');
+      output.textContent = 'Running...';
+      const selectedSkills = skillName ? [{
+        skill_name: skillName,
+        version_id: versionId ? Number(versionId) : null,
+        include_references: includeRefs
+      }] : [];
+
+      try {
+        const res = await fetch(`${API_BASE}/api/runs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt_text: prompt,
+            runtime: 'claude_cli',
+            model_label: 'claude-cli-default',
+            selected_skills: selectedSkills,
+            settings_json: {}
+          })
+        });
+        const data = await res.json();
+        if (data.run_id) currentRunId = data.run_id;
+        if (data.output_text) {
+          output.textContent = data.output_text;
+          showToast('Run completed');
+        } else if (data.error) {
+          output.textContent = `Error: ${data.error}`;
+          showToast('Run failed', 'error');
+        } else {
+          output.textContent = 'No output returned.';
+        }
+      } catch (e) {
+        output.textContent = `Error: ${e.message}`;
+      }
+    }
+
+    function setTestLabRating(rating) {
+      testLabRating = rating;
+      showToast(`Rating set: ${rating}`, 'info');
+    }
+
+    async function submitTestLabFeedback() {
+      if (!currentRunId) { showToast('Run a test first', 'error'); return; }
+      if (!testLabRating) { showToast('Select a rating', 'error'); return; }
+      const tags = document.getElementById('testLabTags').value.split(',').map(t => t.trim()).filter(t => t);
+      const comment = document.getElementById('testLabComment').value.trim();
+      try {
+        const res = await fetch(`${API_BASE}/api/runs/${currentRunId}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating: testLabRating, tags, comment })
+        });
+        if (res.ok) {
+          showToast('Feedback saved');
+          document.getElementById('testLabTags').value = '';
+          document.getElementById('testLabComment').value = '';
+          testLabRating = null;
+        } else {
+          const data = await res.json();
+          showToast(data.error || 'Failed to save feedback', 'error');
+        }
+      } catch (e) {
+        showToast('Feedback error', 'error');
+      }
+    }
+
+    async function createTestCaseFromRun() {
+      if (!currentRunId) { showToast('Run a test first', 'error'); return; }
+      const title = document.getElementById('testLabCaseTitle').value.trim();
+      try {
+        const res = await fetch(`${API_BASE}/api/test-cases/from-run/${currentRunId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Test case saved (#${data.test_case_id})`);
+          document.getElementById('testLabCaseTitle').value = '';
+        } else {
+          showToast(data.error || 'Failed to save test case', 'error');
+        }
+      } catch (e) {
+        showToast('Test case error', 'error');
+      }
+    }
+
     async function deleteSkill(name) {
       if (!confirm(`Delete "${name}"?`)) return;
       try {
@@ -1032,8 +1228,8 @@
       } catch (e) { showToast('Error', 'error'); }
     }
 
-    function exportSkill(name) {
-      const skill = skills.find(s => s.name === name);
+    async function exportSkill(name) {
+      const skill = await fetchSkillContent(name);
       if (!skill) return;
       const blob = new Blob([skill.content || `# ${skill.name}`], { type: 'text/markdown' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${skill.name}-SKILL.md`; a.click();
