@@ -6,13 +6,16 @@
   "main": "dist/index.js",
   "bin": {
     "skills-mcp-server": "dist/index.js",
-    "skills-api": "dist/api.js"
+    "skills-api": "dist/api.js",
+    "skills-mcp-sse": "dist/sse.js"
   },
   "scripts": {
     "start": "node dist/index.js",
     "start:api": "node dist/api.js",
+    "start:sse": "node dist/sse.js",
     "dev": "tsx watch src/index.ts",
     "dev:api": "tsx watch src/api.ts",
+    "dev:sse": "tsx watch src/sse.ts",
     "build": "tsc",
     "clean": "rimraf dist",
     "test": "vitest",
