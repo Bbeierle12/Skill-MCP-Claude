@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Skills Manager - MCP + Claude Code</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -39,6 +42,11 @@
             <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
             <span class="text-gray-500 text-sm">Claude CLI</span>
           </span>
+          <span class="text-gray-600">|</span>
+          <span id="securityStatus" class="flex items-center gap-1" title="Filesystem access restricted to skills/ directory">
+            <i data-lucide="shield-check" class="w-4 h-4 text-green-500"></i>
+            <span class="text-green-500 text-sm">Secure</span>
+          </span>
         </div>
       </div>
       <div class="flex gap-2">
@@ -66,13 +74,20 @@
               </div>
             </button>
             <button onclick="triggerNativeFolderPicker()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
-              <i data-lucide="folder-input" class="w-5 h-5 text-blue-400"></i>
+              <i data-lucide="folder-up" class="w-5 h-5 text-blue-400"></i>
               <div>
-                <div class="font-medium">Import Folder</div>
-                <div class="text-xs text-gray-400">Open file explorer</div>
+                <div class="font-medium">Upload Folder</div>
+                <div class="text-xs text-gray-400">Import from your computer</div>
               </div>
             </button>
             <input type="file" id="nativeFolderInput" webkitdirectory directory multiple class="hidden" onchange="handleNativeFolderSelect(event)">
+            <button onclick="openFolderBrowser()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
+              <i data-lucide="folder-search" class="w-5 h-5 text-green-400"></i>
+              <div>
+                <div class="font-medium">Browse Skills</div>
+                <div class="text-xs text-gray-400">Explore existing skills</div>
+              </div>
+            </button>
             <button onclick="openFileImport()" class="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center gap-3 transition border-t border-gray-700">
               <i data-lucide="files" class="w-5 h-5 text-green-400"></i>
               <div>
@@ -142,56 +157,6 @@
       <p class="text-yellow-300 font-medium">API Server Not Running</p>
       <p class="text-yellow-400/70 text-sm">Start: <code class="bg-gray-800 px-2 py-0.5 rounded">python skills_manager_api.py</code></p>
     </div>
-
-    <!-- Test Lab -->
-    <section class="mt-10 bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold flex items-center gap-2">
-          <i data-lucide="flask-conical" class="w-5 h-5 text-purple-400"></i>
-          Test Lab
-        </h2>
-        <span class="text-xs text-gray-400">Run prompts with skill context, collect feedback, and save test cases.</span>
-      </div>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="lg:col-span-2 space-y-3">
-          <textarea id="testLabPrompt" rows="6" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500" placeholder="Enter your test prompt..."></textarea>
-          <div class="flex flex-wrap items-center gap-3">
-            <select id="testLabSkillSelect" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1" onchange="updateTestLabVersions()">
-              <option value="">No skill context</option>
-            </select>
-            <select id="testLabVersionSelect" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1">
-              <option value="">Published (filesystem)</option>
-            </select>
-            <label class="flex items-center gap-2 text-sm text-gray-400">
-              <input type="checkbox" id="testLabIncludeRefs" class="rounded border-gray-600 bg-gray-900">
-              Include references
-            </label>
-            <button onclick="runTestLab()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm flex items-center gap-2">
-              <i data-lucide="play" class="w-4 h-4"></i> Run
-            </button>
-          </div>
-          <div id="testLabOutput" class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 min-h-[140px] whitespace-pre-wrap">Run output will appear here...</div>
-        </div>
-        <div class="space-y-3">
-          <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 space-y-3">
-            <div class="text-sm font-medium text-gray-200">Feedback</div>
-            <div class="flex gap-2">
-              <button onclick="setTestLabRating('helpful')" class="px-3 py-1 rounded-lg bg-green-600/20 text-green-300 text-xs">Helpful</button>
-              <button onclick="setTestLabRating('partial')" class="px-3 py-1 rounded-lg bg-yellow-600/20 text-yellow-300 text-xs">Partial</button>
-              <button onclick="setTestLabRating('wrong')" class="px-3 py-1 rounded-lg bg-red-600/20 text-red-300 text-xs">Wrong</button>
-            </div>
-            <input id="testLabTags" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Tags (comma-separated)">
-            <textarea id="testLabComment" rows="4" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Add a comment..."></textarea>
-            <button onclick="submitTestLabFeedback()" class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm">Submit Feedback</button>
-          </div>
-          <div class="bg-gray-900/70 border border-gray-700 rounded-xl p-4 space-y-3">
-            <div class="text-sm font-medium text-gray-200">Save as Test Case</div>
-            <input id="testLabCaseTitle" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm" placeholder="Test case title">
-            <button onclick="createTestCaseFromRun()" class="w-full px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm">Create Test Case</button>
-          </div>
-        </div>
-      </div>
-    </section>
   </div>
 
   <!-- Import/Create Modal -->
@@ -253,27 +218,31 @@
 
   <!-- Folder Browser Modal -->
   <div id="folderModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col border border-blue-500/30">
-      <div class="flex items-center justify-between p-6 border-b border-gray-700 bg-gradient-to-r from-blue-900/20 to-transparent">
+    <div class="bg-gray-800 rounded-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col border border-green-500/30">
+      <div class="flex items-center justify-between p-6 border-b border-gray-700 bg-gradient-to-r from-green-900/20 to-transparent">
         <div class="flex items-center gap-3">
-          <i data-lucide="folder-input" class="w-6 h-6 text-blue-400"></i>
+          <i data-lucide="shield-check" class="w-6 h-6 text-green-400"></i>
           <div>
-            <h2 class="text-xl font-bold">Import Folder</h2>
-            <p class="text-gray-400 text-sm">Browse and select a skill folder</p>
+            <h2 class="text-xl font-bold">Browse Skills</h2>
+            <p class="text-gray-400 text-sm">Browse existing skills in your library</p>
           </div>
         </div>
         <button onclick="closeFolderBrowser()" class="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      
-      <!-- Path Input -->
+
+      <!-- Security Notice & Breadcrumbs -->
       <div class="p-4 border-b border-gray-700 bg-gray-900/50">
-        <div class="flex gap-2">
-          <input type="text" id="folderPath" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 font-mono text-sm" placeholder="C:\path\to\skill-folder">
-          <button onclick="navigateToPath()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm">Go</button>
+        <div class="flex items-center gap-2 text-sm text-green-400 mb-2">
+          <i data-lucide="lock" class="w-4 h-4"></i>
+          <span>Secure browsing: <code class="bg-gray-800 px-2 py-0.5 rounded">skills/</code> directory only</span>
         </div>
-        <div id="breadcrumbs" class="flex items-center gap-1 mt-2 text-sm overflow-x-auto"></div>
+        <div id="breadcrumbs" class="flex items-center gap-1 text-sm overflow-x-auto">
+          <button onclick="browsePath('')" class="text-green-400 hover:text-green-300 flex items-center gap-1">
+            <i data-lucide="home" class="w-3 h-3"></i> skills
+          </button>
+        </div>
       </div>
       
       <!-- File List -->
@@ -281,23 +250,23 @@
         <div class="text-gray-500 text-center py-8">Loading...</div>
       </div>
       
-      <!-- Selected Folder Info -->
-      <div id="selectedFolder" class="hidden p-4 border-t border-gray-700 bg-green-900/20">
+      <!-- Selected Skill Info -->
+      <div id="selectedFolder" class="hidden p-4 border-t border-gray-700 bg-purple-900/20">
         <div class="flex items-center gap-3">
-          <i data-lucide="folder-check" class="w-5 h-5 text-green-400"></i>
+          <i data-lucide="folder-check" class="w-5 h-5 text-purple-400"></i>
           <div class="flex-1">
-            <div class="font-medium text-green-300" id="selectedFolderName">folder-name</div>
-            <div class="text-xs text-green-400/70" id="selectedFolderPath">/path/to/folder</div>
+            <div class="font-medium text-purple-300" id="selectedFolderName">skill-name</div>
+            <div class="text-xs text-purple-400/70" id="selectedFolderPath">skills/skill-name</div>
           </div>
         </div>
       </div>
-      
+
       <div class="flex justify-between items-center gap-3 p-6 border-t border-gray-700">
-        <p class="text-gray-500 text-sm" id="folderStatus"></p>
+        <p class="text-gray-500 text-sm" id="folderStatus">Click a skill folder to select it</p>
         <div class="flex gap-3">
           <button onclick="closeFolderBrowser()" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-xl">Cancel</button>
-          <button onclick="importSelectedFolder()" id="importFolderBtn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center gap-2 font-medium disabled:opacity-50" disabled>
-            <i data-lucide="folder-input" class="w-4 h-4"></i> Import Folder
+          <button onclick="viewSelectedSkill()" id="importFolderBtn" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-xl flex items-center gap-2 font-medium disabled:opacity-50" disabled>
+            <i data-lucide="eye" class="w-4 h-4"></i> View Skill
           </button>
         </div>
       </div>
@@ -467,11 +436,36 @@
     let generatedSkillData = null;
     let selectedFolderPath = null;
     let selectedFiles = [];
-    let currentRunId = null;
-    let testLabRating = null;
-    
+
     // Store paths safely to avoid escaping issues
     let browsePathCache = {};
+
+    // Security: Wrap fetch with error handling and timeout
+    async function secureFetch(url, options = {}) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          credentials: 'omit', // Don't send cookies to API
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok && response.status !== 404 && response.status !== 409) {
+          console.warn(`API returned ${response.status} for ${url}`);
+        }
+
+        return response;
+      } catch (e) {
+        clearTimeout(timeout);
+        if (e.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+        throw e;
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
@@ -520,12 +514,11 @@
 
     async function loadSkillsFromAPI() {
       try {
-        const res = await fetch(`${API_BASE}/api/skills?include_content=0`);
+        const res = await fetch(`${API_BASE}/api/skills`);
         const data = await res.json();
         skills = data.skills.map(s => ({ ...s, category: inferCategory(s), tags: s.tags || [] }));
         saveSkillsToStorage();
         updateConsoleSkillSelect();
-        populateTestLabSkills();
       } catch (e) { loadSkillsFromStorage(); }
     }
 
@@ -539,21 +532,10 @@
       return 'other';
     }
 
-    function loadSkillsFromStorage() {
-      const s = localStorage.getItem('mcp-skills-cache');
-      if (s) skills = JSON.parse(s);
-      populateTestLabSkills();
-    }
+    function loadSkillsFromStorage() { const s = localStorage.getItem('mcp-skills-cache'); if (s) skills = JSON.parse(s); }
     function saveSkillsToStorage() { localStorage.setItem('mcp-skills-cache', JSON.stringify(skills)); }
     function updateConsoleSkillSelect() {
       document.getElementById('consoleSkillSelect').innerHTML = '<option value="">No skill context</option>' + skills.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-    }
-
-    function populateTestLabSkills() {
-      const select = document.getElementById('testLabSkillSelect');
-      if (!select) return;
-      select.innerHTML = '<option value="">No skill context</option>' + skills.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-      updateTestLabVersions();
     }
 
     function renderSkills() {
@@ -613,8 +595,20 @@
     }
 
     function filterSkills() { renderSkills(); }
-    async function refreshSkills() { await checkConnection(); showToast('Refreshed!'); }
-    function validateSkillName(input) { input.value = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-'); }
+    async function refreshSkills() {
+      if (!rateLimiter.canCall('refresh')) {
+        showToast('Please wait before refreshing again', 'error');
+        return;
+      }
+      await checkConnection();
+      showToast('Refreshed!');
+    }
+    function validateSkillName(input) {
+      const sanitized = sanitizeSkillName(input.value);
+      if (input.value !== sanitized) {
+        input.value = sanitized;
+      }
+    }
 
     // === Create/Edit Modal ===
     function openImportModal() {
@@ -632,15 +626,24 @@
     function closeImportModal() { document.getElementById('importModal').classList.add('hidden'); document.getElementById('importModal').classList.remove('flex'); }
 
     async function importSkill() {
-      const name = document.getElementById('skillName').value.trim();
+      const rawName = document.getElementById('skillName').value.trim();
       const description = document.getElementById('skillDescription').value.trim();
-      const tags = document.getElementById('skillTags').value.split(',').map(t => t.trim()).filter(t => t);
+      const tags = document.getElementById('skillTags').value.split(',').map(t => t.trim()).filter(t => t && t.length <= 32);
       const content = document.getElementById('skillContent').value;
-      if (!name || !description || !content) { showToast('Fill all fields', 'error'); return; }
+
+      // Validate inputs
+      const name = sanitizeSkillName(rawName);
+      if (!name) { showToast('Valid skill name required', 'error'); return; }
+      if (name.length < 2) { showToast('Skill name too short (min 2 chars)', 'error'); return; }
+      if (!description) { showToast('Description required', 'error'); return; }
+      if (description.length > 500) { showToast('Description too long (max 500 chars)', 'error'); return; }
+      if (!content) { showToast('Content required', 'error'); return; }
+      if (content.length > 100000) { showToast('Content too large (max 100KB)', 'error'); return; }
+      if (tags.length > 10) { showToast('Too many tags (max 10)', 'error'); return; }
 
       try {
-        const endpoint = editingSkill ? `${API_BASE}/api/skills/${editingSkill}` : `${API_BASE}/api/skills`;
-        const res = await fetch(endpoint, {
+        const endpoint = editingSkill ? `${API_BASE}/api/skills/${encodeURIComponent(editingSkill)}` : `${API_BASE}/api/skills`;
+        const res = await secureFetch(endpoint, {
           method: editingSkill ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, description, tags, content })
@@ -654,28 +657,11 @@
           const data = await res.json();
           showToast(data.error || 'Failed', 'error');
         }
-      } catch (e) { showToast('Error', 'error'); }
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
     }
 
-    async function fetchSkillContent(name) {
+    function editSkill(name) {
       const skill = skills.find(s => s.name === name);
-      if (skill && skill.content) return skill;
-      try {
-        const res = await fetch(`${API_BASE}/api/skills/${name}?include_content=1`);
-        if (!res.ok) return skill;
-        const data = await res.json();
-        if (skill) {
-          skill.content = data.content;
-          return skill;
-        }
-        return data;
-      } catch (e) {
-        return skill;
-      }
-    }
-
-    async function editSkill(name) {
-      const skill = await fetchSkillContent(name);
       if (!skill) return;
       editingSkill = name;
       document.getElementById('modalTitle').textContent = 'Edit Skill';
@@ -729,7 +715,7 @@
         
         if (data.success) {
           showToast(`Imported "${data.name}" (${data.files_imported.length} files)`, 'success');
-          loadSkillsFromAPI();
+          loadSkills();
         } else {
           showToast(data.error || 'Import failed', 'error');
         }
@@ -741,24 +727,27 @@
       event.target.value = '';
     }
 
-    // === Folder Browser (FIXED) ===
+    // === Folder Browser (RESTRICTED to skills/ directory) ===
+    let currentBrowsePath = '';
+
     function openFolderBrowser() {
       toggleImportMenu();
       selectedFolderPath = null;
       browsePathCache = {};
+      currentBrowsePath = '';
       document.getElementById('importFolderBtn').disabled = true;
       document.getElementById('selectedFolder').classList.add('hidden');
-      document.getElementById('folderPath').value = '';
       document.getElementById('folderModal').classList.remove('hidden');
       document.getElementById('folderModal').classList.add('flex');
       browsePath('');
       lucide.createIcons();
     }
 
-    function closeFolderBrowser() { document.getElementById('folderModal').classList.add('hidden'); document.getElementById('folderModal').classList.remove('flex'); }
+    function closeFolderBrowser() {
+      document.getElementById('folderModal').classList.add('hidden');
+      document.getElementById('folderModal').classList.remove('flex');
+    }
 
-    function navigateToPath() { browsePath(document.getElementById('folderPath').value); }
-    
     // Click handler that uses cached paths
     function handleFolderClick(id) {
       const path = browsePathCache[id];
@@ -766,7 +755,7 @@
         browsePath(path);
       }
     }
-    
+
     function handleSelectFolder(id) {
       const entry = browsePathCache[id];
       if (entry) {
@@ -774,48 +763,60 @@
       }
     }
 
-    async function browsePath(path) {
+    async function browsePath(relativePath) {
       const contents = document.getElementById('folderContents');
       contents.innerHTML = '<div class="text-gray-500 text-center py-8">Loading...</div>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/browse?path=${encodeURIComponent(path)}`);
+        const res = await fetch(`${API_BASE}/api/browse?path=${encodeURIComponent(relativePath)}`);
         const data = await res.json();
 
-        if (data.error) { 
-          contents.innerHTML = `<div class="text-red-400 text-center py-8">${data.error}</div>`; 
-          return; 
+        if (data.error) {
+          // Show security error with appropriate styling
+          const isSecurityError = data.error.toLowerCase().includes('denied') ||
+                                  data.error.toLowerCase().includes('traversal');
+          const errorClass = isSecurityError ? 'text-red-400' : 'text-yellow-400';
+          const icon = isSecurityError ? 'shield-alert' : 'alert-circle';
+          contents.innerHTML = `
+            <div class="${errorClass} text-center py-8">
+              <i data-lucide="${icon}" class="w-8 h-8 mx-auto mb-2"></i>
+              <div>${escapeHtml(data.error)}</div>
+            </div>`;
+          lucide.createIcons();
+          return;
         }
 
-        document.getElementById('folderPath').value = data.path || '';
-        
+        currentBrowsePath = data.path || '';
+
         // Clear and rebuild path cache
         browsePathCache = {};
         let idCounter = 0;
-        
-        // Breadcrumbs
+
+        // Build breadcrumbs for relative path within skills/
         const crumbs = document.getElementById('breadcrumbs');
+        let crumbHtml = `<button onclick="browsePath('')" class="text-green-400 hover:text-green-300 flex items-center gap-1">
+          <i data-lucide="home" class="w-3 h-3"></i> skills
+        </button>`;
+
         if (data.path) {
           const parts = data.path.split(/[/\\]/).filter(p => p);
-          let crumbHtml = '';
           for (let i = 0; i < parts.length; i++) {
-            const fullPath = parts.slice(0, i + 1).join('\\');
+            const pathUpTo = parts.slice(0, i + 1).join('/');
             const crumbId = `crumb_${idCounter++}`;
-            browsePathCache[crumbId] = fullPath;
-            crumbHtml += `<button onclick="handleFolderClick('${crumbId}')" class="text-blue-400 hover:text-blue-300">${parts[i]}</button><span class="text-gray-600">/</span>`;
+            browsePathCache[crumbId] = pathUpTo;
+            crumbHtml += `<span class="text-gray-600">/</span>`;
+            crumbHtml += `<button onclick="handleFolderClick('${crumbId}')" class="text-green-400 hover:text-green-300">${escapeHtml(parts[i])}</button>`;
           }
-          crumbs.innerHTML = crumbHtml;
-        } else {
-          crumbs.innerHTML = '';
         }
+        crumbs.innerHTML = crumbHtml;
 
         let html = '';
-        
-        // Parent directory
-        if (data.parent) {
+
+        // Parent directory (only if not at root)
+        if (data.parent !== null && data.parent !== undefined) {
           const parentId = `parent_${idCounter++}`;
           browsePathCache[parentId] = data.parent;
-          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="handleFolderClick('${parentId}')">
+          html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer hover:bg-gray-700/50" onclick="handleFolderClick('${parentId}')">
             <i data-lucide="corner-left-up" class="w-5 h-5 text-gray-500"></i>
             <span class="text-gray-400">..</span>
           </div>`;
@@ -825,18 +826,18 @@
         for (const dir of data.dirs) {
           const dirId = `dir_${idCounter++}`;
           const isSkill = dir.is_skill;
-          
+
           if (isSkill) {
             browsePathCache[dirId] = { path: dir.path, name: dir.name };
-            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer skill-folder bg-purple-900/20" onclick="handleSelectFolder('${dirId}')">
+            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer skill-folder bg-purple-900/20 hover:bg-purple-900/30" onclick="handleSelectFolder('${dirId}')">
               <i data-lucide="folder-check" class="w-5 h-5 text-purple-400"></i>
               <span class="text-purple-300">${escapeHtml(dir.name)}</span>
               <span class="ml-auto text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded">SKILL</span>
             </div>`;
           } else {
             browsePathCache[dirId] = dir.path;
-            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer" onclick="handleFolderClick('${dirId}')">
-              <i data-lucide="folder" class="w-5 h-5 text-blue-400"></i>
+            html += `<div class="folder-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer hover:bg-gray-700/50" onclick="handleFolderClick('${dirId}')">
+              <i data-lucide="folder" class="w-5 h-5 text-green-400"></i>
               <span>${escapeHtml(dir.name)}</span>
             </div>`;
           }
@@ -844,60 +845,100 @@
 
         // Files (just for display)
         for (const file of data.files.slice(0, 20)) {
-          html += `<div class="flex items-center gap-3 px-4 py-2 text-gray-500">
-            <i data-lucide="file" class="w-4 h-4"></i>
+          const isSkillMd = file.name.toLowerCase() === 'skill.md';
+          html += `<div class="flex items-center gap-3 px-4 py-2 ${isSkillMd ? 'text-purple-400' : 'text-gray-500'}">
+            <i data-lucide="${isSkillMd ? 'file-text' : 'file'}" class="w-4 h-4"></i>
             <span class="text-sm">${escapeHtml(file.name)}</span>
           </div>`;
         }
 
-        contents.innerHTML = html || '<div class="text-gray-500 text-center py-8">Empty directory</div>';
+        if (data.files.length > 20) {
+          html += `<div class="text-gray-500 text-sm px-4 py-2">...and ${data.files.length - 20} more files</div>`;
+        }
+
+        contents.innerHTML = html || '<div class="text-gray-500 text-center py-8"><i data-lucide="folder-open" class="w-8 h-8 mx-auto mb-2"></i><div>Empty directory</div></div>';
         lucide.createIcons();
       } catch (e) {
-        contents.innerHTML = `<div class="text-red-400 text-center py-8">Error: ${e.message}</div>`;
+        contents.innerHTML = `<div class="text-red-400 text-center py-8">
+          <i data-lucide="wifi-off" class="w-8 h-8 mx-auto mb-2"></i>
+          <div>Connection error: ${escapeHtml(e.message)}</div>
+        </div>`;
+        lucide.createIcons();
       }
     }
     
+    // Security: Robust HTML escaping to prevent XSS
     function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
       const div = document.createElement('div');
-      div.textContent = str;
+      div.textContent = String(str);
       return div.innerHTML;
     }
 
-    function selectFolder(path, name) {
-      selectedFolderPath = path;
+    // Security: Sanitize user input for skill names
+    function sanitizeSkillName(name) {
+      if (!name) return '';
+      return name.toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 64); // Max length
+    }
+
+    // Security: Validate API response structure
+    function isValidApiResponse(data) {
+      return data && typeof data === 'object' && !Array.isArray(data);
+    }
+
+    // Security: Safe JSON parse with error handling
+    function safeJsonParse(text, fallback = null) {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error('JSON parse error:', e);
+        return fallback;
+      }
+    }
+
+    // Security: Rate limiting for API calls
+    const rateLimiter = {
+      lastCall: {},
+      minInterval: 100, // ms between calls to same endpoint
+      canCall(endpoint) {
+        const now = Date.now();
+        const last = this.lastCall[endpoint] || 0;
+        if (now - last < this.minInterval) return false;
+        this.lastCall[endpoint] = now;
+        return true;
+      }
+    };
+
+    function selectFolder(relativePath, name) {
+      selectedFolderPath = relativePath;
       document.getElementById('selectedFolderName').textContent = name;
-      document.getElementById('selectedFolderPath').textContent = path;
+      document.getElementById('selectedFolderPath').textContent = `skills/${relativePath}`;
       document.getElementById('selectedFolder').classList.remove('hidden');
       document.getElementById('importFolderBtn').disabled = false;
     }
 
-    async function importSelectedFolder() {
+    async function viewSelectedSkill() {
+      // Since we're browsing existing skills, "import" really means "view"
       if (!selectedFolderPath) return;
-      document.getElementById('folderStatus').textContent = 'Importing...';
-      document.getElementById('importFolderBtn').disabled = true;
 
-      try {
-        const res = await fetch(`${API_BASE}/api/import/folder`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: selectedFolderPath })
-        });
-        const data = await res.json();
+      // Extract skill name from the relative path
+      const skillName = selectedFolderPath.split('/')[0];
+      closeFolderBrowser();
+      viewSkill(skillName);
+    }
 
-        if (data.success) {
-          await loadSkillsFromAPI();
-          renderSkills();
-          closeFolderBrowser();
-          showToast(`Imported ${data.files_imported} files!`);
-        } else {
-          showToast(data.error || 'Import failed', 'error');
-          document.getElementById('importFolderBtn').disabled = false;
-        }
-      } catch (e) {
-        showToast('Error: ' + e.message, 'error');
-        document.getElementById('importFolderBtn').disabled = false;
-      }
-      document.getElementById('folderStatus').textContent = '';
+    async function importSelectedFolder() {
+      // Note: This now works with skills that exist in the skills/ directory
+      // The folder browser shows existing skills, not external folders
+      if (!selectedFolderPath) return;
+
+      const skillName = selectedFolderPath.split('/')[0];
+      closeFolderBrowser();
+      viewSkill(skillName);
     }
 
     // === File Upload ===
@@ -1055,8 +1096,8 @@
     }
 
     // === View/Console ===
-    async function viewSkill(name) {
-      const skill = await fetchSkillContent(name);
+    function viewSkill(name) {
+      const skill = skills.find(s => s.name === name);
       if (!skill) return;
       currentViewSkill = name;
       document.getElementById('viewModalTitle').innerHTML = `<i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i><span>${skill.name}</span>`;
@@ -1087,10 +1128,7 @@
 
       try {
         let skillContext = '';
-        if (skillName) {
-          const skill = await fetchSkillContent(skillName);
-          if (skill) skillContext = skill.content || '';
-        }
+        if (skillName) { const skill = skills.find(s => s.name === skillName); if (skill) skillContext = skill.content || ''; }
         const res = await fetch(`${API_BASE}/api/claude/run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1108,128 +1146,31 @@
       output.scrollTop = output.scrollHeight;
     }
 
-    async function updateTestLabVersions() {
-      const skillName = document.getElementById('testLabSkillSelect').value;
-      const versionSelect = document.getElementById('testLabVersionSelect');
-      if (!skillName) {
-        versionSelect.innerHTML = '<option value="">Published (filesystem)</option>';
+    async function deleteSkill(name) {
+      // Security: Validate skill name before deletion
+      const safeName = sanitizeSkillName(name);
+      if (!safeName || safeName !== name) {
+        showToast('Invalid skill name', 'error');
         return;
       }
-      try {
-        const res = await fetch(`${API_BASE}/api/skills/${skillName}/versions`);
-        const data = await res.json();
-        if (data.versions) {
-          versionSelect.innerHTML = '<option value="">Published (filesystem)</option>' +
-            data.versions.map(v => `<option value="${v.id}">v${v.version_number} · ${v.status}</option>`).join('');
-        }
-      } catch (e) {
-        versionSelect.innerHTML = '<option value="">Published (filesystem)</option>';
-      }
-    }
 
-    async function runTestLab() {
-      const prompt = document.getElementById('testLabPrompt').value.trim();
-      if (!prompt) { showToast('Enter a prompt', 'error'); return; }
-      const skillName = document.getElementById('testLabSkillSelect').value;
-      const versionId = document.getElementById('testLabVersionSelect').value;
-      const includeRefs = document.getElementById('testLabIncludeRefs').checked;
-      const output = document.getElementById('testLabOutput');
-      output.textContent = 'Running...';
-      const selectedSkills = skillName ? [{
-        skill_name: skillName,
-        version_id: versionId ? Number(versionId) : null,
-        include_references: includeRefs
-      }] : [];
+      if (!confirm(`Delete "${escapeHtml(name)}"?\n\nThis action cannot be undone.`)) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/runs`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt_text: prompt,
-            runtime: 'claude_cli',
-            model_label: 'claude-cli-default',
-            selected_skills: selectedSkills,
-            settings_json: {}
-          })
-        });
-        const data = await res.json();
-        if (data.run_id) currentRunId = data.run_id;
-        if (data.output_text) {
-          output.textContent = data.output_text;
-          showToast('Run completed');
-        } else if (data.error) {
-          output.textContent = `Error: ${data.error}`;
-          showToast('Run failed', 'error');
-        } else {
-          output.textContent = 'No output returned.';
-        }
-      } catch (e) {
-        output.textContent = `Error: ${e.message}`;
-      }
-    }
-
-    function setTestLabRating(rating) {
-      testLabRating = rating;
-      showToast(`Rating set: ${rating}`, 'info');
-    }
-
-    async function submitTestLabFeedback() {
-      if (!currentRunId) { showToast('Run a test first', 'error'); return; }
-      if (!testLabRating) { showToast('Select a rating', 'error'); return; }
-      const tags = document.getElementById('testLabTags').value.split(',').map(t => t.trim()).filter(t => t);
-      const comment = document.getElementById('testLabComment').value.trim();
-      try {
-        const res = await fetch(`${API_BASE}/api/runs/${currentRunId}/feedback`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating: testLabRating, tags, comment })
-        });
+        const res = await secureFetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
         if (res.ok) {
-          showToast('Feedback saved');
-          document.getElementById('testLabTags').value = '';
-          document.getElementById('testLabComment').value = '';
-          testLabRating = null;
+          await loadSkillsFromAPI();
+          renderSkills();
+          showToast('Deleted');
         } else {
           const data = await res.json();
-          showToast(data.error || 'Failed to save feedback', 'error');
+          showToast(data.error || 'Delete failed', 'error');
         }
-      } catch (e) {
-        showToast('Feedback error', 'error');
-      }
+      } catch (e) { showToast('Error: ' + e.message, 'error'); }
     }
 
-    async function createTestCaseFromRun() {
-      if (!currentRunId) { showToast('Run a test first', 'error'); return; }
-      const title = document.getElementById('testLabCaseTitle').value.trim();
-      try {
-        const res = await fetch(`${API_BASE}/api/test-cases/from-run/${currentRunId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          showToast(`Test case saved (#${data.test_case_id})`);
-          document.getElementById('testLabCaseTitle').value = '';
-        } else {
-          showToast(data.error || 'Failed to save test case', 'error');
-        }
-      } catch (e) {
-        showToast('Test case error', 'error');
-      }
-    }
-
-    async function deleteSkill(name) {
-      if (!confirm(`Delete "${name}"?`)) return;
-      try {
-        const res = await fetch(`${API_BASE}/api/skills/${name}`, { method: 'DELETE' });
-        if (res.ok) { await loadSkillsFromAPI(); renderSkills(); showToast('Deleted'); }
-      } catch (e) { showToast('Error', 'error'); }
-    }
-
-    async function exportSkill(name) {
-      const skill = await fetchSkillContent(name);
+    function exportSkill(name) {
+      const skill = skills.find(s => s.name === name);
       if (!skill) return;
       const blob = new Blob([skill.content || `# ${skill.name}`], { type: 'text/markdown' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${skill.name}-SKILL.md`; a.click();
