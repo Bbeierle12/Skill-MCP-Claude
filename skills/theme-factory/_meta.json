@@ -1,6 +1,6 @@
 {
   "name": "theme-factory",
-  "description": "This skill provides a curated collection of professional font and color themes themes, each with carefully selected color palettes and font pairings. Once a theme is chosen, it can be applied to any artifact. To apply consistent, professional styling to presentation slide decks, use this skill. Each",
+  "description": "Toolkit for styling artifacts with professional themes. Provides 10 pre-set themes with colors and fonts that can be applied to slides, docs, reports, HTML landing pages, or any artifact.",
   "tags": [
     "ui-design",
     "css",

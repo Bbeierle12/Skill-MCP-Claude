@@ -1,6 +1,6 @@
 {
   "name": "algorithmic-art",
-  "description": "To begin, create an ALGORITHMIC PHILOSOPHY (not static images or templates) that will be interpreted through: - Computational processes, emergent behavior, mathematical beauty",
+  "description": "Creating algorithmic art using p5.js with seeded randomness and interactive parameter exploration. Use this when users request creating art using code, generative art, algorithmic art, flow fields, or particle systems.",
   "tags": [
     "3d",
     "shaders",

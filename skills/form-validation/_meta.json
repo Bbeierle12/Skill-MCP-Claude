@@ -1,6 +1,6 @@
 {
   "name": "form-validation",
-  "description": "Schema-first validation using Zod as the single source of truth for both runtime validation and TypeScript types. import { z } from 'zod';",
+  "description": "Schema-first validation with Zod, timing patterns (reward early, punish late), async validation, and error message design. Use when implementing form validation for any framework.",
   "tags": [
     "forms",
     "typescript",

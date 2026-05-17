@@ -1,6 +1,6 @@
 {
   "name": "structural-physics",
-  "description": "Stability validation and damage systems for building mechanics. import { HeuristicValidator } from './scripts/heuristic-validator.js';",
+  "description": "Structural validation and damage systems for Three.js building games. Use when implementing building stability, damage propagation, cascading collapse, or realistic physics simulation.",
   "tags": [
     "building-game",
     "3d",

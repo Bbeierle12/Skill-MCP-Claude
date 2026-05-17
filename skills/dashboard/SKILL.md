@@ -1,3 +1,8 @@
+---
+name: dashboard
+description: Data dashboard development patterns including charts, real-time updates, filtering, and responsive layouts for analytics applications.
+---
+
 # Dashboard Router
 
 Routes to specialized sub-skills for data dashboard development.

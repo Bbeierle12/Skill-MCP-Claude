@@ -1,6 +1,6 @@
 {
   "name": "terrain-integration",
-  "description": "Foundation placement, slope handling, and terrain modification for building systems. import { TerrainAnalyzer } from './scripts/terrain-analyzer.js';",
+  "description": "Terrain interaction systems for Three.js building games. Use when implementing slope handling, foundation anchoring, terrain modification, auto-leveling, or pillar/support generation.",
   "tags": [
     "building-game",
     "3d",

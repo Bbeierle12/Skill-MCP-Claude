@@ -1,6 +1,6 @@
 {
   "name": "form-accessibility",
-  "description": "WCAG 2.2 AA compliance patterns for forms. Ensures forms work for keyboard users, screen reader users, and users with cognitive or motor disabilities. // Accessible form field pattern",
+  "description": "WCAG 2.2 AA compliance for forms, ARIA patterns, focus management, keyboard navigation, and screen reader support. Use when implementing accessible forms in any framework.",
   "tags": [
     "forms",
     "web",

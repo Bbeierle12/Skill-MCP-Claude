@@ -1,6 +1,6 @@
 {
   "name": "multiplayer-building",
-  "description": "Networking layer for multiplayer building games. import { BuildingNetworkServer, BuildingNetworkClient } from './scripts/building-network-manager.js';",
+  "description": "Networking systems for multiplayer building games. Use when implementing networked construction, delta synchronization, client prediction, or conflict resolution.",
   "tags": [
     "building-game",
     "web",

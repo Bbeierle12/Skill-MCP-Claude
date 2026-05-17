@@ -1,6 +1,6 @@
 {
   "name": "scientific-documentation",
-  "description": "Generate exhaustive, research-grade documentation for coding projects that serves both as a learning resource and technical reference. Act as a Principal Research Scientist and Computer Science Educator. Prepare documentation that meets academic standards for completeness while remaining accessible ",
+  "description": "Generate comprehensive scientific research-style documentation for completed coding projects. Use when the user requests project documentation, a technical breakdown, a study paper, or wants to understand everything about a project they built.",
   "tags": [
     "documentation",
     "python",

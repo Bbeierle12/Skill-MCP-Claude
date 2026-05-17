@@ -1,6 +1,6 @@
 {
   "name": "form-ux-patterns",
-  "description": "Patterns for complex forms based on cognitive load research and aviation UX principles. // Multi-step form with chunking",
+  "description": "UX patterns for complex forms including multi-step wizards, cognitive chunking, progressive disclosure, and conditional fields. Use when building checkout flows, onboarding wizards, or forms with many fields.",
   "tags": [
     "forms",
     "ui-design",
