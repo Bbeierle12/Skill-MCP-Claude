@@ -1,6 +1,6 @@
 {
   "name": "r3f-performance",
-  "description": "R3F performance optimization\u2014LOD (Level of Detail), frustum culling, instancing strategies, draw call reduction, frame budgets, lazy loading, and profiling tools. Use when optimizing render performance, handling large scenes, or debugging frame rate issues.",
+  "description": "R3F performance optimization—LOD (Level of Detail), frustum culling, instancing strategies, draw call reduction, frame budgets, lazy loading, and profiling tools. Use when optimizing render performance, handling large scenes, or debugging frame rate issues.",
   "tags": [
     "3d",
     "r3f",
@@ -13,5 +13,8 @@
   "depends_on": [
     "r3f-fundamentals"
   ],
-  "enhances": []
+  "enhances": [],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }

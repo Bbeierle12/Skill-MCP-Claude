@@ -1,6 +1,6 @@
 {
   "name": "r3f-drei",
-  "description": "@react-three/drei helper library\u2014OrbitControls, Text, Environment, useTexture, useGLTF, Html, Billboard, and 50+ abstractions that simplify common R3F patterns. Use when implementing camera controls, loading assets, rendering text, or needing common 3D utilities.",
+  "description": "@react-three/drei helper library—OrbitControls, Text, Environment, useTexture, useGLTF, Html, Billboard, and 50+ abstractions that simplify common R3F patterns. Use when implementing camera controls, loading assets, rendering text, or needing common 3D utilities.",
   "tags": [
     "3d",
     "r3f",
@@ -13,5 +13,8 @@
   "depends_on": [
     "r3f-fundamentals"
   ],
-  "enhances": []
+  "enhances": [],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }

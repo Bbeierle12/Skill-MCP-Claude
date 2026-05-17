@@ -144,6 +144,14 @@
         <option value="visual">Visual/Creative</option>
         <option value="other">Other</option>
       </select>
+      <select id="tierFilter" title="Relevance tier from the daily audit" class="bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 min-w-[180px]" onchange="filterSkills()">
+        <option value="all">All Tiers</option>
+        <option value="A">Tier A — Irreplaceable</option>
+        <option value="B">Tier B — Trim & keep</option>
+        <option value="C">Tier C — Redundant</option>
+        <option value="D">Tier D — Obsolete</option>
+        <option value="unrated">Unrated (no audit yet)</option>
+      </select>
     </div>
 
     <!-- Skills Grid -->
@@ -543,10 +551,18 @@
       const empty = document.getElementById('emptyState');
       const search = document.getElementById('searchInput').value.toLowerCase();
       const cat = document.getElementById('categoryFilter').value;
+      const tier = (document.getElementById('tierFilter') || {}).value || 'all';
 
       const filtered = skills.filter(s => {
         const match = s.name.includes(search) || (s.description || '').toLowerCase().includes(search);
-        return match && (cat === 'all' || s.category === cat);
+        if (!match) return false;
+        if (cat !== 'all' && s.category !== cat) return false;
+        if (tier !== 'all') {
+          const t = s.relevance_tier;
+          if (tier === 'unrated') { if (t) return false; }
+          else if (t !== tier) return false;
+        }
+        return true;
       });
 
       if (filtered.length === 0) { grid.classList.add('hidden'); empty.classList.remove('hidden'); }
@@ -556,13 +572,17 @@
           <div class="skill-card bg-gray-800/70 rounded-xl p-5 border border-gray-700/50 hover:border-purple-500/50 transition-all cursor-pointer" onclick="viewSkill('${s.name}')">
             <div class="flex items-start justify-between mb-3">
               <h3 class="font-semibold text-white">${s.name}</h3>
-              <span class="text-xs px-2 py-1 rounded-lg ${getCategoryColor(s.category)}">${s.category}</span>
+              <div class="flex gap-1.5 items-center">
+                ${s.relevance_tier ? `<span title="Audit tier: ${tierLabel(s.relevance_tier)}" class="text-xs px-2 py-1 rounded-lg ${getTierColor(s.relevance_tier)}">${s.relevance_tier}</span>` : ''}
+                <span class="text-xs px-2 py-1 rounded-lg ${getCategoryColor(s.category)}">${s.category}</span>
+              </div>
             </div>
             <p class="text-gray-400 text-sm mb-3 line-clamp-2">${s.description || 'No description'}</p>
             <div class="flex gap-2 text-xs text-gray-500">
               ${s.has_scripts ? '<span class="bg-gray-700 px-2 py-0.5 rounded">scripts/</span>' : ''}
               ${s.has_references ? '<span class="bg-gray-700 px-2 py-0.5 rounded">refs/</span>' : ''}
               ${s.file_count ? `<span>${s.file_count} files</span>` : ''}
+              ${typeof s.review_score === 'number' ? `<span title="Audit score" class="ml-auto">score ${s.review_score}/100</span>` : ''}
             </div>
             <div class="flex gap-3 pt-3 mt-3 border-t border-gray-700/50">
               <button onclick="event.stopPropagation(); editSkill('${s.name}')" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
@@ -585,6 +605,17 @@
     function getCategoryColor(c) {
       const colors = { development: 'bg-blue-500/20 text-blue-300', documentation: 'bg-green-500/20 text-green-300', forms: 'bg-yellow-500/20 text-yellow-300', building: 'bg-purple-500/20 text-purple-300', visual: 'bg-pink-500/20 text-pink-300', other: 'bg-gray-500/20 text-gray-300' };
       return colors[c] || colors.other;
+    }
+
+    // Relevance-tier visual treatment, fed by the daily audit's
+    // _meta.json.relevance_tier field (A/B/C/D). A = green (keep), B = amber
+    // (trim), C = orange (likely redundant), D = red (obsolete).
+    function getTierColor(t) {
+      const colors = { A: 'bg-emerald-500/20 text-emerald-300', B: 'bg-amber-500/20 text-amber-300', C: 'bg-orange-500/20 text-orange-300', D: 'bg-red-500/20 text-red-300' };
+      return colors[t] || 'bg-gray-500/20 text-gray-300';
+    }
+    function tierLabel(t) {
+      return ({ A: 'Irreplaceable', B: 'Trim & keep', C: 'Redundant', D: 'Obsolete' })[t] || 'Unrated';
     }
 
     function updateStats() {

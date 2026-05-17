@@ -1,0 +1,25 @@
+{
+  "aggregate": {
+    "total_skills": 78,
+    "avg_skill_md_lines": 301.8,
+    "pct_with_assets": 44.9,
+    "pct_description_mismatch": 44.9,
+    "type_counts": {
+      "creative-engine": 3,
+      "discipline": 13,
+      "router": 10,
+      "template": 52
+    },
+    "source_counts": {
+      "claude-examples": 10,
+      "claude-public": 6,
+      "claude-user": 61,
+      "obra/superpowers": 1
+    }
+  },
+  "tiers": {
+    "3d-building-advanced": "A",
+    "algorithmic-art": "A"
+  },
+  "saved_at": "2026-05-17"
+}
