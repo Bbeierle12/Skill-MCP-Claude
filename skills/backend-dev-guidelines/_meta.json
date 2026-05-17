@@ -1,6 +1,6 @@
 {
   "name": "backend-dev-guidelines",
-  "description": "Backend development guidelines for Node.js/Express/TypeScript applications. Layered architecture (Routes \u2192 Controllers \u2192 Services \u2192 Repositories), error handling, validation, middleware patterns, database access, and testing. Use when creating routes, endpoints, APIs, controllers, services, repositories, middleware, or working with backend code.",
+  "description": "Backend development guidelines for Node.js/Express/TypeScript applications. Layered architecture (Routes → Controllers → Services → Repositories), error handling, validation, middleware patterns, database access, and testing. Use when creating routes, endpoints, APIs, controllers, services, repositories, middleware, or working with backend code.",
   "tags": [
     "web",
     "python",
@@ -14,5 +14,8 @@
     "aws-skills",
     "mcp-builder",
     "multiplayer-building"
-  ]
+  ],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }

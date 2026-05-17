@@ -11,5 +11,8 @@
   "source": "claude-user",
   "type": "template",
   "depends_on": [],
-  "enhances": []
+  "enhances": [],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }

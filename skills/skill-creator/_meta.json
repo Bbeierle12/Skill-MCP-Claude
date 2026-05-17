@@ -11,5 +11,8 @@
   "depends_on": [],
   "enhances": [
     "router-template"
-  ]
+  ],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }

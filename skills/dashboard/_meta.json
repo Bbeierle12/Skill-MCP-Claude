@@ -44,5 +44,8 @@
   "depends_on": [],
   "enhances": [
     "d3js-visualization"
-  ]
+  ],
+  "last_reviewed_at": null,
+  "review_score": null,
+  "relevance_tier": null
 }
