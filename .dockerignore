@@ -1,0 +1,49 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+*.egg
+.eggs
+.venv
+venv
+ENV
+env
+.coverage
+htmlcov
+.pytest_cache
+
+# Build artefacts
+build
+dist
+*.spec
+
+# Frontend (not used by the API image; built/served separately on Vercel)
+frontend/node_modules
+frontend/coverage
+frontend/dist
+
+# Alternate implementations / experiments not needed for the Python API image
+skills-mcp-server
+rust
+api
+
+# Editor / OS
+.idea
+.vscode
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docs and meta files
+docs
+.claude
+
+# Local secrets / env files
+.env
+.env.*
+!.env.example

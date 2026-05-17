@@ -715,7 +715,7 @@
         
         if (data.success) {
           showToast(`Imported "${data.name}" (${data.files_imported.length} files)`, 'success');
-          loadSkills();
+          loadSkillsFromAPI();
         } else {
           showToast(data.error || 'Import failed', 'error');
         }

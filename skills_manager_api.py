@@ -258,14 +258,17 @@ def api_reload_index():
 
 if __name__ == "__main__":
     cli_path = find_claude_cli()
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", "5050"))
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     print(f"""
 ================================================================
            Skills Manager API + Claude Code CLI
 ================================================================
-  Server:     http://localhost:5050
+  Server:     http://{host}:{port}
   Skills:     {SKILLS_DIR}
   Claude CLI: {cli_path or 'Not found'}
   Browse:     RESTRICTED to skills/ directory
 ================================================================
 """)
-    app.run(port=5050, debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true")
+    app.run(host=host, port=port, debug=debug)
