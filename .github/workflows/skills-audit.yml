@@ -1,0 +1,71 @@
+name: Skills Catalogue Audit
+
+# Daily structural audit + per-skill content review.
+# Weekly catalogue-level review runs every Monday.
+#
+# The workflow is intentionally LLM-free in CI — the deterministic rubric
+# stands on its own. Use the Workflow Dispatch input `use_llm=true` from a
+# trusted environment (where the Claude CLI is installed and authenticated)
+# to also produce the LLM-assisted rubric.
+
+on:
+  schedule:
+    # 06:30 UTC every day. Monday picks up the weekly Pass 3 as well.
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+    inputs:
+      use_llm:
+        description: "Invoke Claude CLI for Pass 2 (requires CLI on PATH)"
+        type: boolean
+        default: false
+      weekly:
+        description: "Force weekly Pass 3 even if today is not Monday"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skills-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Decide whether to run the weekly Pass 3
+        id: weekly_flag
+        run: |
+          if [ "${{ github.event.inputs.weekly }}" = "true" ] || [ "$(date -u +%u)" = "1" ]; then
+            echo "weekly=--weekly" >> "$GITHUB_OUTPUT"
+          else
+            echo "weekly=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run daily audit
+        run: |
+          python scripts/run_daily_audit.py \
+            ${{ steps.weekly_flag.outputs.weekly }} \
+            ${{ github.event.inputs.use_llm == 'true' && '--use-llm' || '' }}
+
+      - name: Commit report
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          git add reports/ skills/
+          if git diff --staged --quiet; then
+            echo "No audit changes to commit."
+          else
+            git commit -m "chore(audit): daily skills catalogue review $(date -u +%F)"
+            git push
+          fi

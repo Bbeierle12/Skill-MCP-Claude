@@ -91,6 +91,53 @@ Manual test:
 python server.py
 ```
 
+## Daily Skills Catalogue Audit
+
+The repo ships an automated review system that grades every skill daily and
+surfaces improvement opportunities. See `reports/` for the latest output.
+
+### What it does
+
+- **Pass 1 (deterministic, every run):** structural defects — missing files,
+  description drift between `_meta.json` and SKILL.md frontmatter, broken
+  references, unknown `depends_on` targets, oversized SKILL.md files, thin
+  asset-less skills, duplicate sub-skill triggers, stale reviews.
+- **Pass 2 (one skill per run):** content audit of the skill whose
+  `last_reviewed_at` is oldest. Runs a deterministic rubric (description
+  distinctness vs. tag-cluster siblings, library version mentions, asset
+  richness, cross-references), proposes a `relevance_tier` (A/B/C/D), and
+  optionally calls the Claude CLI for an LLM-assisted rubric.
+- **Pass 3 (weekly):** catalogue-level review — sibling description overlap,
+  router necessity, tag-cluster drift vs. last week's snapshot, source
+  distribution.
+
+### Running locally
+
+```bash
+# Add the audit metadata fields once (idempotent):
+python scripts/backfill_audit_meta.py
+
+# Daily run (writes reports/YYYY-MM-DD.md):
+python scripts/run_daily_audit.py
+
+# With weekly Pass 3 + the LLM rubric:
+python scripts/run_daily_audit.py --weekly --use-llm
+```
+
+The GitHub Actions workflow `.github/workflows/skills-audit.yml` runs the
+daily audit at 06:30 UTC and commits the resulting report. The Monday run
+also performs Pass 3.
+
+### Metadata fields added to `_meta.json`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `last_reviewed_at` | ISO date or null | When Pass 2 last audited this skill |
+| `review_score` | int 0–100 or null | Composite of distinctness + asset richness + freshness + cross-references |
+| `relevance_tier` | "A" / "B" / "C" / "D" / null | A = irreplaceable, B = trim & keep, C = redundant with base-model output, D = obsolete |
+
+The Skills Manager UI shows these as a filter dropdown and a per-card badge.
+
 ## Development
 
 ### Key Files to Edit

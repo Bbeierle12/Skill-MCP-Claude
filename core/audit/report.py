@@ -19,11 +19,12 @@ def _findings_table(findings: Iterable[AuditFinding]) -> str:
     rows = sorted(findings, key=lambda f: (f.severity != "error", f.severity != "warn", f.skill, f.code))
     if not rows:
         return "_No structural defects detected._\n"
+    escaped_pipe = "\\|"
     lines = ["| Severity | Skill | Code | Message |", "|---|---|---|---|"]
     for f in rows:
-        msg = f.message.replace("|", "\\|")
+        msg = f.message.replace("|", escaped_pipe)
         if f.detail:
-            msg += f" — _{f.detail.replace('|', chr(92) + chr(124))}_"
+            msg += f" — _{f.detail.replace('|', escaped_pipe)}_"
         lines.append(f"| {f.severity} | `{f.skill}` | `{f.code}` | {msg} |")
     return "\n".join(lines) + "\n"
 

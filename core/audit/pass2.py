@@ -337,10 +337,15 @@ def run_pass2(
     meta["last_reviewed_at"] = today_iso() if today is None else today.isoformat()
     meta["review_score"] = result.review_score
     # Only update the tier if it is missing OR the deterministic proposal is
-    # more conservative than the stored tier (we never auto-promote to A).
+    # more conservative (further down the A→D scale) than the stored tier.
+    # Defensively guard against unexpected stored values — never auto-promote.
     stored_tier = meta.get("relevance_tier")
-    if stored_tier not in RELEVANCE_TIERS or RELEVANCE_TIERS.index(result.relevance_tier) > RELEVANCE_TIERS.index(stored_tier):
-        meta["relevance_tier"] = result.relevance_tier
+    proposed = result.relevance_tier
+    if proposed in RELEVANCE_TIERS:
+        if stored_tier not in RELEVANCE_TIERS:
+            meta["relevance_tier"] = proposed
+        elif RELEVANCE_TIERS.index(proposed) > RELEVANCE_TIERS.index(stored_tier):
+            meta["relevance_tier"] = proposed
     save_meta(skills_dir / skill_name, meta)
 
     return result

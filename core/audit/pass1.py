@@ -87,9 +87,16 @@ def run_pass1(
             findings.append(AuditFinding(name, "missing-meta", "error", "_meta.json missing"))
             continue  # remaining checks all need meta
 
-        # 2. name matches directory
+        # 2. name field present and matches directory
         meta_name = meta.get("name")
-        if meta_name and meta_name != name:
+        if not meta_name:
+            findings.append(
+                AuditFinding(
+                    name, "missing-name", "error",
+                    "_meta.json has no 'name' field",
+                )
+            )
+        elif meta_name != name:
             findings.append(
                 AuditFinding(
                     name, "name-mismatch", "error",

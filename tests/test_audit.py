@@ -215,6 +215,24 @@ class TestPass1:
         findings = run_pass1(s)
         assert any(f.code == "split-candidate" for f in findings)
 
+    def test_finds_missing_name(self, tmp_path):
+        s = tmp_path / "skills"
+        s.mkdir()
+        # Author a meta.json that omits 'name' entirely.
+        d = s / "nameless"
+        d.mkdir()
+        (d / "_meta.json").write_text(
+            json.dumps({
+                "description": "Use when you forgot to fill in the name field.",
+                "tags": [], "sub_skills": [], "source": "x", "type": "template",
+                "depends_on": [], "enhances": [],
+            }) + "\n",
+            encoding="utf-8",
+        )
+        (d / "SKILL.md").write_text("---\nname: nameless\ndescription: same\n---\n", encoding="utf-8")
+        findings = run_pass1(s)
+        assert any(f.code == "missing-name" for f in findings)
+
     def test_duplicate_trigger_detected(self, tmp_path):
         s = tmp_path / "skills"
         s.mkdir()
@@ -274,8 +292,8 @@ class TestPass2:
     def test_pass2_persists_metadata(self, catalogue):
         result = run_pass2(catalogue, skill_name="brand-guidelines", use_llm=False)
         meta = load_meta(catalogue / "brand-guidelines")
-        assert meta["last_reviewed_at"] == date.today().isoformat() or meta["last_reviewed_at"] == result.skill  # tolerate today
-        assert meta["last_reviewed_at"]  # truthy
+        # last_reviewed_at must be today's ISO date (Pass 2 stamps it).
+        assert meta["last_reviewed_at"] == date.today().isoformat()
         assert meta["review_score"] == result.review_score
         assert meta["relevance_tier"] in {"A", "B", "C", "D"}
 
