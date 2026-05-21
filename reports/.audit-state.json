@@ -22,7 +22,8 @@
     "algorithmic-art": "A",
     "audio-analysis": "B",
     "audio-playback": "B",
-    "audio-reactive": "B"
+    "audio-reactive": "B",
+    "audio-router": "C"
   },
-  "saved_at": "2026-05-20"
+  "saved_at": "2026-05-21"
 }
