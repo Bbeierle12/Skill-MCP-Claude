@@ -23,7 +23,8 @@
     "audio-analysis": "B",
     "audio-playback": "B",
     "audio-reactive": "B",
-    "audio-router": "C"
+    "audio-router": "C",
+    "aws-skills": "B"
   },
-  "saved_at": "2026-05-21"
+  "saved_at": "2026-05-22"
 }
