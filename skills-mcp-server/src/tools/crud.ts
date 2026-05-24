@@ -20,6 +20,7 @@ import {
   type ExportSkillInput
 } from '../schemas/tools.js';
 import { toolError, toolSuccessJson, handleFsError } from '../utils/errors.js';
+import { validateMeta } from '../schemas/meta.js';
 import { SKILL_FILE, META_FILE } from '../constants.js';
 
 /**
@@ -135,26 +136,38 @@ Examples:
         // Directory doesn't exist, good to proceed
       }
 
+      // Build the full metadata up front and enforce the canonical contract
+      // BEFORE creating anything, so a skill cannot be born invalid.
+      const meta: {
+        name: string;
+        description: string;
+        tags: string[];
+        sub_skills: Array<{ name: string; file: string; triggers: string[] }>;
+        source: string;
+      } = {
+        name: params.name,
+        description: params.description,
+        tags: params.tags || [],
+        sub_skills: params.template === 'with-sub-skills'
+          ? [{ name: 'example', file: 'references/example.md', triggers: [] }]
+          : [],
+        source: 'created'
+      };
+
+      const metaCheck = validateMeta(meta);
+      if (!metaCheck.success) {
+        return toolError(
+          `Cannot create skill: _meta.json violates the canonical schema: ${metaCheck.error}`
+        );
+      }
+
       try {
         // Create skill directory
         await fs.mkdir(skillDir, { recursive: true });
 
         const createdFiles: string[] = [];
 
-        // Create _meta.json
-        const meta: {
-          name: string;
-          description: string;
-          tags: string[];
-          sub_skills: Array<{ name: string; file: string; triggers: string[] }>;
-          source: string;
-        } = {
-          name: params.name,
-          description: params.description,
-          tags: params.tags || [],
-          sub_skills: [],
-          source: 'created'
-        };
+        // Create _meta.json (validated above)
         await fs.writeFile(
           path.join(skillDir, META_FILE),
           JSON.stringify(meta, null, 2)
@@ -175,23 +188,12 @@ Examples:
           await fs.mkdir(refsDir);
           createdFiles.push('references/');
 
-          // Create an example sub-skill
+          // Create the example sub-skill referenced in meta.sub_skills
           await fs.writeFile(
             path.join(refsDir, 'example.md'),
             '# Example Sub-Skill\n\nAdd content here.\n'
           );
           createdFiles.push('references/example.md');
-
-          // Update meta with sub-skill
-          meta.sub_skills = [{
-            name: 'example',
-            file: 'references/example.md',
-            triggers: []
-          }];
-          await fs.writeFile(
-            path.join(skillDir, META_FILE),
-            JSON.stringify(meta, null, 2)
-          );
         }
 
         // Trigger index reload
@@ -261,8 +263,32 @@ Examples:
       }
 
       const updated: string[] = [];
+      const metaPath = path.join(skillDir, META_FILE);
 
       try {
+        // If metadata is changing, merge and enforce the canonical contract
+        // BEFORE writing anything — this also refuses to write back an
+        // already-invalid on-disk _meta.json.
+        let mergedMeta: Record<string, unknown> | undefined;
+        if (params.description !== undefined || params.tags !== undefined) {
+          const metaContent = await fs.readFile(metaPath, 'utf-8');
+          mergedMeta = JSON.parse(metaContent) as Record<string, unknown>;
+
+          if (params.description !== undefined) {
+            mergedMeta.description = params.description;
+          }
+          if (params.tags !== undefined) {
+            mergedMeta.tags = params.tags;
+          }
+
+          const metaCheck = validateMeta(mergedMeta);
+          if (!metaCheck.success) {
+            return toolError(
+              `Cannot update skill: _meta.json would violate the canonical schema: ${metaCheck.error}`
+            );
+          }
+        }
+
         // Update SKILL.md if content provided
         if (params.content !== undefined) {
           await fs.writeFile(
@@ -272,23 +298,15 @@ Examples:
           updated.push('SKILL.md');
         }
 
-        // Update _meta.json if description or tags provided
-        if (params.description !== undefined || params.tags !== undefined) {
-          const metaPath = path.join(skillDir, META_FILE);
-          const metaContent = await fs.readFile(metaPath, 'utf-8');
-          const meta = JSON.parse(metaContent);
-
+        // Write validated metadata if it changed
+        if (mergedMeta !== undefined) {
           if (params.description !== undefined) {
-            meta.description = params.description;
             updated.push('description');
           }
-
           if (params.tags !== undefined) {
-            meta.tags = params.tags;
             updated.push('tags');
           }
-
-          await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
+          await fs.writeFile(metaPath, JSON.stringify(mergedMeta, null, 2));
         }
 
         // Trigger index reload

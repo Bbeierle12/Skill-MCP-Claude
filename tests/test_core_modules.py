@@ -203,6 +203,24 @@ class TestCreateSkillEdgeCases:
         skill_md = (patched_skills_dir / "foo" / "SKILL.md").read_text()
         assert "description: second" in skill_md
 
+    def test_rejects_empty_description(self, patched_skills_dir):
+        # The canonical contract forbids an empty description; creation must fail
+        # loudly and write nothing.
+        data, err = skills.create_skill("good-name", description="")
+        assert data is None
+        assert "Invalid skill metadata" in err
+        assert "description" in err
+        assert not (patched_skills_dir / "good-name").exists()
+
+    def test_rejects_string_sub_skills(self, patched_skills_dir):
+        # sub_skills entries must be objects, not bare strings.
+        data, err = skills.create_skill(
+            "good-name", description="A valid description", sub_skills=["just-a-string"]
+        )
+        assert data is None
+        assert "Invalid skill metadata" in err
+        assert not (patched_skills_dir / "good-name").exists()
+
 
 class TestUpdateSkillEdgeCases:
     def test_recovers_from_bad_existing_meta(self, patched_skills_dir):
@@ -216,6 +234,28 @@ class TestUpdateSkillEdgeCases:
         assert meta["description"] == "new"
         # tags defaults to [] when there was no recoverable previous value
         assert meta["tags"] == []
+
+    def test_tags_only_update_preserves_description(self, patched_skills_dir):
+        # A tags-only update must not blank an existing description.
+        skills.create_skill("keep-desc", description="Original description")
+        data, err = skills.update_skill("keep-desc", tags=["new-tag"])
+        assert err is None
+        meta = json.loads((patched_skills_dir / "keep-desc" / "_meta.json").read_text())
+        assert meta["description"] == "Original description"
+        assert meta["tags"] == ["new-tag"]
+
+    def test_rejects_update_that_produces_invalid_meta(self, patched_skills_dir):
+        # Existing meta has no description and none is provided -> merged meta is
+        # invalid, so the update is refused and the file left unchanged.
+        sk = patched_skills_dir / "no-desc"
+        sk.mkdir()
+        (sk / "SKILL.md").write_text("# no-desc", encoding="utf-8")
+        (sk / "_meta.json").write_text('{"name": "no-desc"}', encoding="utf-8")
+        data, err = skills.update_skill("no-desc", tags=["x"])
+        assert data is None
+        assert "Invalid skill metadata" in err
+        # File must be untouched.
+        assert json.loads((sk / "_meta.json").read_text()) == {"name": "no-desc"}
 
 
 class TestImportFolderEdgeCases:

@@ -16,6 +16,7 @@ from .security import (
     sanitize_description, validate_upload_file,
 )
 from .utils import sanitize_name, extract_description_from_frontmatter, create_skill_markdown
+from .meta_schema import validate_meta
 
 
 def list_all_skills() -> list[dict[str, Any]]:
@@ -143,13 +144,8 @@ def create_skill(
 
     description = sanitize_description(description)
 
-    skill_dir.mkdir(parents=True, exist_ok=True)
-
-    # Write SKILL.md
-    skill_md = create_skill_markdown(name, description, content)
-    (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
-
-    # Write _meta.json
+    # Build metadata and enforce the canonical contract BEFORE touching disk, so
+    # a skill cannot be created in an invalid state.
     meta = {
         "name": name,
         "description": description,
@@ -157,6 +153,17 @@ def create_skill(
         "sub_skills": sub_skills or [],
         "source": "created",
     }
+    meta_errors = validate_meta(meta)
+    if meta_errors:
+        return None, f"Invalid skill metadata: {'; '.join(meta_errors)}"
+
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write SKILL.md
+    skill_md = create_skill_markdown(name, description, content)
+    (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+
+    # Write _meta.json
     (skill_dir / "_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     return {"success": True, "name": name, "path": str(skill_dir)}, None
@@ -188,11 +195,7 @@ def update_skill(
 
     description = sanitize_description(description)
 
-    # Write updated SKILL.md
-    skill_md = create_skill_markdown(name, description, content)
-    (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
-
-    # Update _meta.json
+    # Load existing metadata (recover gracefully from a corrupt file).
     meta_file = skill_dir / "_meta.json"
     meta = {}
     if meta_file.exists():
@@ -201,11 +204,22 @@ def update_skill(
         except (json.JSONDecodeError, OSError) as e:
             logger.warning("Failed to read existing metadata for %s, starting fresh: %s", name, e)
 
+    # Preserve the existing description when none is provided, so a tags-only
+    # update doesn't blank it. Enforce the canonical contract on the merged
+    # result BEFORE writing anything.
+    new_description = description if description else meta.get("description", "")
     meta.update({
         "name": name,
-        "description": description,
+        "description": new_description,
         "tags": tags if tags is not None else meta.get("tags", []),
     })
+    meta_errors = validate_meta(meta)
+    if meta_errors:
+        return None, f"Invalid skill metadata: {'; '.join(meta_errors)}"
+
+    # Write updated SKILL.md and metadata.
+    skill_md = create_skill_markdown(name, new_description, content)
+    (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
     meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     return {"success": True, "name": name}, None
