@@ -11,6 +11,9 @@ flask-limiter>=3.5.0
 # Optional YAML frontmatter parsing
 PyYAML>=6.0
 
+# Canonical _meta.json schema validation (shared contract)
+jsonschema>=4.0.0
+
 # Build (optional)
 pyinstaller>=6.0.0
 

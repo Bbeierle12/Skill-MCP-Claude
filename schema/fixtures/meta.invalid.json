@@ -1,0 +1,6 @@
+{
+  "name": "Bad_Name",
+  "description": "Required fields are present, so the only failures are the canonical-contract rules: an illegal name, an out-of-enum type, and an unknown field.",
+  "type": "not-a-real-type",
+  "mystery_field": 123
+}
