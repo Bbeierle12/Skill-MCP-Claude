@@ -10,6 +10,8 @@ import pytest
 from core.audit import models
 from core.audit.models import (
     AUDIT_META_FIELDS,
+    AuditFinding,
+    SkillStats,
     extract_frontmatter_description,
     extract_referenced_paths,
     load_meta,
@@ -22,6 +24,7 @@ from core.audit.pass1 import (
     run_pass1,
 )
 from core.audit.pass2 import (
+    Pass2Result,
     run_deterministic_rubric,
     run_pass2,
     select_next_skill,
@@ -33,7 +36,17 @@ from core.audit.pass3 import (
     save_cluster_snapshot,
     tag_clusters,
 )
-from core.audit.report import render_daily_report
+from core.audit.report import (
+    _findings_table,
+    _pass2_block,
+    _pass3_block,
+    _stats_block,
+    _tier_watch_block,
+    current_tier_map,
+    load_state,
+    render_daily_report,
+    save_state,
+)
 
 
 # ---------- Fixtures ----------
@@ -388,6 +401,156 @@ class TestReport:
         # Only "stale-review" risk excluded by recent timestamp; should be empty.
         bad = [f for f in findings if f.severity == "error"]
         assert bad == []
+
+
+class TestReportBlocks:
+    """Exercise the individual report-assembly helpers and their branches."""
+
+    def test_findings_table_empty(self):
+        assert _findings_table([]) == "_No structural defects detected._\n"
+
+    def test_findings_table_escapes_pipes_and_detail(self):
+        f = AuditFinding(
+            skill="x", code="C1", severity="error",
+            message="bad | value", detail="see | here",
+        )
+        out = _findings_table([f])
+        assert "bad \\| value" in out
+        assert "see \\| here" in out
+        assert "`x`" in out
+
+    def test_stats_block_renders_deltas_with_sign(self):
+        current = {
+            "total_skills": 10, "avg_skill_md_lines": 6.0,
+            "pct_with_assets": 50.0, "pct_description_mismatch": 2.0,
+            "type_counts": {"template": 8}, "source_counts": {"claude-user": 10},
+        }
+        previous = {
+            "total_skills": 8, "avg_skill_md_lines": 7.0,
+            "pct_with_assets": 50.0, "pct_description_mismatch": 2.0,
+        }
+        out = _stats_block(current, previous)
+        assert "**10 (+2)**" in out          # positive delta, line count
+        assert "**6 (-1)**" in out           # negative delta, no "+" sign
+        assert "Type distribution: template=8" in out
+        assert "Source distribution: claude-user=10" in out
+
+    def test_stats_block_no_previous_shows_plain_values(self):
+        out = _stats_block({"total_skills": 3, "avg_skill_md_lines": None,
+                            "pct_with_assets": 0.0, "pct_description_mismatch": 0.0}, None)
+        assert "**3**" in out
+        assert "**—**" in out                 # None value renders as em dash
+
+    def test_pass2_block_none_is_skipped_message(self):
+        assert _pass2_block(None) == "_Pass 2 skipped: no skills found._\n"
+
+    def test_pass2_block_with_versions_suggestions_and_llm_error(self):
+        p2 = Pass2Result(
+            skill="demo",
+            rubric={
+                "proposed_tier_justification": "solid",
+                "when_to_use_distinct": True, "closest_sibling_overlap": 0.1,
+                "trigger_cue_present": True, "has_scripts": True,
+                "has_references": False, "n_sub_skills": 0, "line_count": 42,
+                "version_mentions": ["react@18", "node@22"],
+            },
+            review_score=77, relevance_tier="B",
+            suggestions=["tighten the description"],
+            llm_error="rate limited",
+        )
+        out = _pass2_block(p2)
+        assert "pinned versions detected: `react@18, node@22`" in out
+        assert "tighten the description" in out
+        assert "LLM rubric skipped: rate limited" in out
+
+    def test_pass2_block_with_llm_answer(self):
+        p2 = Pass2Result(
+            skill="demo", rubric={"line_count": 10},
+            llm_answer="  the model said this  ",
+        )
+        out = _pass2_block(p2)
+        assert "<details><summary>LLM rubric answer</summary>" in out
+        assert "the model said this" in out
+
+    def test_tier_watch_block_lists_cd_and_marks_slid(self):
+        stats = {
+            "good": SkillStats(name="good", meta={"relevance_tier": "A"}),
+            "weak": SkillStats(name="weak", meta={"relevance_tier": "C"}),
+            "dead": SkillStats(name="dead", meta={"relevance_tier": "D"}),
+        }
+        out = _tier_watch_block(stats, previous_tiers={"weak": "B", "dead": "D"})
+        assert "`weak`" in out and "`dead`" in out
+        assert "`good`" not in out             # tier A excluded
+        assert "| B |" in out                  # weak slid from B
+        # dead unchanged (D->D) renders an em dash, not a tier
+        assert "| `dead` | **D** | — |" in out
+
+    def test_tier_watch_block_empty_when_no_cd(self):
+        stats = {"good": SkillStats(name="good", meta={"relevance_tier": "A"})}
+        assert _tier_watch_block(stats, None) == "_No skills currently in Tier C or D._\n"
+
+    def test_pass3_block_full(self):
+        p3 = {
+            "overlap_pairs": [
+                {"tag": "forms", "skill_a": "a", "skill_b": "b", "overlap": 0.6}
+            ],
+            "router_necessity": [
+                {"router": "r", "leaves": ["x", "y"], "weak_leaves": 1,
+                 "recommendation": "keep"}
+            ],
+            "coverage_delta": {
+                "grew": {"forms": (2, 4)}, "shrank": {"ui": (5, 3)},
+                "new": ["fresh"], "gone": ["stale"],
+            },
+            "source_distribution": {"claude-user": 5},
+        }
+        out = _pass3_block(p3)
+        assert "Sibling description overlap" in out
+        assert "`a`" in out and "`b`" in out
+        assert "Router necessity" in out
+        assert "Grew: `forms` 2→4" in out
+        assert "Shrank: `ui` 5→3" in out
+        assert "New tags: `fresh`" in out
+        assert "Removed tags: `stale`" in out
+        assert "**Source distribution:** claude-user=5" in out
+
+    def test_pass3_block_coverage_delta_no_changes(self):
+        p3 = {"coverage_delta": {"grew": {}, "shrank": {}, "new": [], "gone": []}}
+        out = _pass3_block(p3)
+        assert "_No tag-cluster changes since the previous snapshot._" in out
+
+
+class TestReportState:
+    """Cover state persistence + tier snapshotting helpers."""
+
+    def test_load_state_missing_returns_empty(self, tmp_path):
+        assert load_state(tmp_path / "nope.json") == {}
+
+    def test_load_state_roundtrip(self, tmp_path):
+        p = tmp_path / "state.json"
+        save_state(p, aggregate={"total_skills": 4}, tiers={"x": "A"})
+        loaded = load_state(p)
+        assert loaded["aggregate"] == {"total_skills": 4}
+        assert loaded["tiers"] == {"x": "A"}
+        assert "saved_at" in loaded
+
+    def test_load_state_corrupt_returns_empty(self, tmp_path):
+        p = tmp_path / "bad.json"
+        p.write_text("{not valid json", encoding="utf-8")
+        assert load_state(p) == {}
+
+    def test_save_state_creates_parent_dirs(self, tmp_path):
+        p = tmp_path / "nested" / "deep" / "state.json"
+        save_state(p, aggregate={}, tiers={})
+        assert p.exists()
+
+    def test_current_tier_map_snapshots_only_tiered_skills(self, tmp_path):
+        s = tmp_path / "skills"
+        s.mkdir()
+        _write_skill(s, "tiered", meta={"description": "d", "relevance_tier": "C"})
+        _write_skill(s, "untiered", meta={"description": "d"})
+        tier_map = current_tier_map(s)
+        assert tier_map == {"tiered": "C"}
 
 
 # ---------- Backfill script ----------
