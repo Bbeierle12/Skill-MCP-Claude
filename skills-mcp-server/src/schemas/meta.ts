@@ -1,62 +1,57 @@
 /**
- * Zod schemas for _meta.json validation
+ * _meta.json validation.
+ *
+ * The field set lives in exactly ONE place: schema/meta.schema.json at the repo
+ * root — the canonical contract shared with the Python (jsonschema) and Rust
+ * validators. This module is a thin ajv adapter over that file; it deliberately
+ * does NOT define the schema itself.
  */
 
-import { z } from 'zod';
+import { Ajv, type ErrorObject } from 'ajv';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import type { SkillMeta } from '../types.js';
 
-/**
- * Sub-skill schema for nested skill references
- */
-export const SubSkillSchema = z.object({
-  name: z.string()
-    .min(1, 'Sub-skill name is required')
-    .describe('Sub-skill identifier'),
-  file: z.string()
-    .min(1, 'Sub-skill file path is required')
-    .describe('Relative path to sub-skill markdown file'),
-  triggers: z.array(z.string())
-    .optional()
-    .describe('Trigger words for search discovery')
-}).strict();
+export type { SkillMeta, SubSkillMeta } from '../types.js';
 
-/**
- * Main _meta.json schema
- */
-export const MetaSchema = z.object({
-  name: z.string()
-    .min(1, 'Skill name is required')
-    .regex(/^[a-z0-9-]+$/, 'Name must be lowercase alphanumeric with hyphens')
-    .describe('Skill name matching directory name'),
-  description: z.string()
-    .min(1, 'Description is required')
-    .describe('Human-readable skill description'),
-  tags: z.array(z.string())
-    .optional()
-    .describe('Tags for search discovery'),
-  sub_skills: z.array(SubSkillSchema)
-    .optional()
-    .describe('Sub-skills for router/parent skills'),
-  source: z.string()
-    .optional()
-    .describe('Source of the skill (e.g., "imported", "claude-examples")')
-}).strict();
+// schema/meta.schema.json lives at the repo root.
+// This file resolves to src/schemas (dev/test) or dist/schemas (built); both are
+// three levels below the repo root.
+const SCHEMA_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..',
+  'schema',
+  'meta.schema.json'
+);
+
+const schema = JSON.parse(readFileSync(SCHEMA_PATH, 'utf-8'));
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validateSchema = ajv.compile(schema);
 
 /**
- * Inferred types from Zod schemas
+ * Validate _meta.json content against the canonical schema and return a typed
+ * result. Mirrors the Python `core.meta_schema.validate_meta` contract.
  */
-export type SubSkillMeta = z.infer<typeof SubSkillSchema>;
-export type SkillMeta = z.infer<typeof MetaSchema>;
-
-/**
- * Validate _meta.json content and return typed result
- */
-export function validateMeta(content: unknown): { success: true; data: SkillMeta } | { success: false; error: string } {
-  const result = MetaSchema.safeParse(content);
-  if (result.success) {
-    return { success: true, data: result.data };
+export function validateMeta(
+  content: unknown
+): { success: true; data: SkillMeta } | { success: false; error: string } {
+  if (validateSchema(content)) {
+    return { success: true, data: content as SkillMeta };
   }
-  return {
-    success: false,
-    error: result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
-  };
+  const error = (validateSchema.errors ?? [])
+    .map((e: ErrorObject) => {
+      const loc = e.instancePath ? e.instancePath.replace(/^\//, '').replace(/\//g, '.') : '';
+      const extra =
+        e.keyword === 'additionalProperties' &&
+        e.params &&
+        'additionalProperty' in e.params
+          ? ` (${(e.params as { additionalProperty: string }).additionalProperty})`
+          : '';
+      return `${loc ? `${loc}: ` : ''}${e.message ?? 'invalid'}${extra}`;
+    })
+    .join('; ');
+  return { success: false, error };
 }

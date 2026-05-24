@@ -1,0 +1,15 @@
+{
+  "name": "forms-router",
+  "description": "Routes form-building requests to the right sub-skill.",
+  "tags": ["forms", "validation", "router"],
+  "sub_skills": [
+    { "name": "react", "file": "references/react.md", "triggers": ["useform", "hook"] }
+  ],
+  "source": "claude-user",
+  "type": "router",
+  "depends_on": ["form-validation"],
+  "enhances": ["dashboard"],
+  "last_reviewed_at": "2026-05-24",
+  "review_score": 72,
+  "relevance_tier": "B"
+}

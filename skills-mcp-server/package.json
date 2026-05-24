@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
+    "ajv": "^8.20.0",
     "archiver": "^7.0.1",
     "chokidar": "^3.5.3",
     "cors": "^2.8.5",

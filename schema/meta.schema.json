@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Bbeierle12/Skill-MCP-Claude/schema/meta.schema.json",
+  "title": "_meta.json",
+  "description": "Canonical contract for a skill's _meta.json (schema v2.0). This is the single source of truth: the Python (jsonschema) and TypeScript (ajv) validators both validate against THIS file. Do not redefine the field set anywhere else.",
+  "type": "object",
+  "required": ["name", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Skill identifier. Lowercase alphanumeric with hyphens; must match the skill's directory name."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable description of what the skill provides."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Keyword tags for search and categorization."
+    },
+    "sub_skills": {
+      "type": "array",
+      "description": "Sub-skill references for router/composite skills.",
+      "items": {
+        "type": "object",
+        "required": ["name", "file", "triggers"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sub-skill identifier."
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative path to the sub-skill markdown file (e.g. references/<name>.md)."
+          },
+          "triggers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Keywords that trigger loading this sub-skill."
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "string",
+      "description": "Provenance marker (e.g. claude-user, claude-examples, claude-public, obra/superpowers). Not enum-locked; a controlled vocabulary is a FUTURE concern."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["template", "discipline", "router", "creative-engine"],
+      "description": "Skill classification (schema v1.2)."
+    },
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Names of skills this skill depends on (schema v2.0 dependency graph)."
+    },
+    "enhances": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Names of skills this skill enhances (schema v2.0 dependency graph)."
+    },
+    "last_reviewed_at": {
+      "type": ["string", "null"],
+      "description": "ISO date/datetime of the last audit review, or null if never reviewed. Written by the audit system."
+    },
+    "review_score": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Audit review score (0-100), or null if unscored. Written by the audit system."
+    },
+    "relevance_tier": {
+      "type": ["string", "null"],
+      "enum": ["A", "B", "C", "D", null],
+      "description": "Model-capability relevance tier, or null if unassigned. Written by the audit system."
+    }
+  }
+}
