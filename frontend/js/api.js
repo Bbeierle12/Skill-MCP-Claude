@@ -66,8 +66,8 @@ function delay(ms) {
  */
 export const API = {
   // Relative URLs when the Flask server serves the frontend itself on :5050.
-  // When the frontend is served from a different local dev-server port
-  // (e.g. 8888/3000), point at the local Flask API on :5050.
+  // When the frontend is served from a separate dev server (e.g. `serve` on
+  // :3000), point at the local Flask API on :5050.
   baseUrl: (location.hostname === 'localhost' || location.hostname === '127.0.0.1') && location.port !== '5050'
     ? 'http://localhost:5050'
     : '',

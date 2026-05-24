@@ -481,7 +481,7 @@ class TestReportBlocks:
         out = _tier_watch_block(stats, previous_tiers={"weak": "B", "dead": "D"})
         assert "`weak`" in out and "`dead`" in out
         assert "`good`" not in out             # tier A excluded
-        assert "| B |" in out                  # weak slid from B
+        assert "| `weak` | **C** | B |" in out  # weak slid from B
         # dead unchanged (D->D) renders an em dash, not a tier
         assert "| `dead` | **D** | — |" in out
 

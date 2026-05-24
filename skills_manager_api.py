@@ -46,8 +46,6 @@ CORS(app, origins=[
     'http://127.0.0.1:5050',
     'http://localhost:3000',  # Dev server
     'http://127.0.0.1:3000',
-    'http://localhost:8888',  # Dev server (alt port)
-    'http://127.0.0.1:8888',
 ], supports_credentials=False)
 
 SKILLS_DIR = get_skills_dir()
