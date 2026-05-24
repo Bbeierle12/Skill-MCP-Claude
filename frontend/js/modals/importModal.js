@@ -582,22 +582,13 @@ async function generateSkill() {
   generateBtn.innerHTML = '<div class="loading-spinner w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Generating...';
 
   try {
-    // AI generation removed - use Claude Code CLI directly
-
-    // Show result
-    const resultEl = document.getElementById('ai-result');
-    const previewEl = document.getElementById('ai-preview');
-    const nameInput = document.getElementById('ai-skill-name');
-
-    resultEl.classList.remove('hidden');
-    previewEl.innerHTML = `<pre class="text-sm text-gray-300 whitespace-pre-wrap">${escapeHtml(result.skill.content)}</pre>`;
-
-    if (result.skill.name) {
-      nameInput.value = result.skill.name;
-    }
-
-    // Store generated content
-    resultEl.dataset.content = result.skill.content;
+    // AI generation has been removed from the web UI; skill generation now
+    // happens directly in the Claude Code CLI. Surface that to the user instead
+    // of pretending to generate a result here.
+    errorsEl.textContent =
+      'AI generation has moved to the Claude Code CLI. Generate the skill there, ' +
+      'then refresh this page to see it.';
+    errorsEl.classList.remove('hidden');
 
   } catch (error) {
     console.error('Failed to generate skill:', error);

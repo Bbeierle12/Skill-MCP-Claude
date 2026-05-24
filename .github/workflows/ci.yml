@@ -41,14 +41,35 @@ jobs:
       - name: Run pytest
         run: pytest
 
+  mcp-server-test:
+    name: MCP server build + smoke tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skills-mcp-server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: skills-mcp-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (type-check)
+        run: npm run build
+
+      - name: Smoke tests
+        run: npm run test:run
+
   frontend-lint-test:
     name: Frontend lint + unit tests (Vitest)
     runs-on: ubuntu-latest
-    # The frontend is mid-migration from the single-file UI in
-    # skills-manager.html to a modular SPA, so some lint warnings/errors and
-    # unit test failures are pre-existing and tracked separately. Surface them
-    # in CI but don't block PRs on them until the migration stabilizes.
-    continue-on-error: true
     defaults:
       run:
         working-directory: frontend
@@ -61,21 +82,42 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: frontend/package.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        # The frontend has no committed package-lock.json yet, so fall back to
-        # `npm install` when `npm ci` cannot be used. Once a lockfile lands the
-        # lint/test job will automatically prefer `npm ci`.
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: npm ci
 
       - name: Lint
         run: npm run lint
 
       - name: Unit tests
         run: npm run test:run
+
+  rust-test:
+    name: Rust tests (cargo test)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [rust/skills-mcp, rust/creation_station_db]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.crate }}/target
+          key: cargo-${{ runner.os }}-${{ matrix.crate }}-${{ hashFiles(format('{0}/Cargo.toml', matrix.crate)) }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ matrix.crate }}-
+
+      - name: Run tests
+        working-directory: ${{ matrix.crate }}
+        run: cargo test --all-targets

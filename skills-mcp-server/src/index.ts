@@ -12,13 +12,11 @@
  *   SKILLS_DIR - Path to skills directory (default: ../skills)
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { getSkillsDir } from './constants.js';
-import { SkillIndexer, SearchService, FileWatcher, StatsTracker } from './services/index.js';
-import { registerAllTools } from './tools/index.js';
-import type { ServiceContext } from './types.js';
+import { FileWatcher } from './services/index.js';
+import { createServiceContext, buildServer } from './server.js';
 
 async function main(): Promise<void> {
   const skillsDir = getSkillsDir();
@@ -27,34 +25,18 @@ async function main(): Promise<void> {
   console.error(`[Skills MCP Server] Skills directory: ${skillsDir}`);
 
   // Initialize services
-  const indexer = new SkillIndexer(skillsDir);
-  const search = new SearchService(indexer);
-  const stats = new StatsTracker();
+  const ctx = createServiceContext(skillsDir);
 
   // Pre-load indexes
-  const { skillCount, contentFilesIndexed } = await indexer.reload();
+  const { skillCount, contentFilesIndexed } = await ctx.indexer.reload();
   console.error(`[Skills MCP Server] Indexed ${skillCount} skills, ${contentFilesIndexed} content files`);
 
-  // Create service context
-  const ctx: ServiceContext = {
-    indexer,
-    search,
-    stats,
-    skillsDir
-  };
-
-  // Create MCP server
-  const server = new McpServer({
-    name: 'skills-mcp-server',
-    version: '1.0.0'
-  });
-
-  // Register all tools
-  registerAllTools(server, ctx);
+  // Create MCP server with all tools registered
+  const server = buildServer(ctx);
 
   // Start file watcher
   const watcher = new FileWatcher(skillsDir, async () => {
-    await indexer.reload();
+    await ctx.indexer.reload();
   });
   watcher.start();
 
