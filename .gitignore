@@ -44,3 +44,10 @@ htmlcov/
 
 # IDE
 .vscode/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/coverage/
+frontend/dist/
+npm-debug.log*

@@ -25,11 +25,20 @@ def get_app_dir() -> Path:
 
 
 def get_skills_dir() -> Path:
-    """Get the skills directory path."""
+    """Get the skills directory path.
+
+    Can be overridden via the ``SKILLS_DIR`` environment variable. This is
+    useful for container deployments where the skills directory is mounted
+    from a volume outside the application directory.
+    """
     global _skills_dir
     if _skills_dir is None:
-        _skills_dir = get_app_dir() / "skills"
-        _skills_dir.mkdir(exist_ok=True)
+        env_path = os.environ.get("SKILLS_DIR")
+        if env_path:
+            _skills_dir = Path(env_path).expanduser().resolve()
+        else:
+            _skills_dir = get_app_dir() / "skills"
+        _skills_dir.mkdir(parents=True, exist_ok=True)
     return _skills_dir
 
 

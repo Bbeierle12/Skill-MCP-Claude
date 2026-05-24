@@ -286,14 +286,42 @@ export const API = {
     },
 
     /**
-     * Import files via multipart form
-     * @param {FormData} formData - Form data with files
+     * Import files. Accepts a FormData with a `skill_name` field and one
+     * File entry per file. Files are read as base64 and posted to the
+     * `/api/import/json` endpoint, since the Flask backend does not expose
+     * a multipart `/api/import/files` route.
+     *
+     * @param {FormData} formData - Form data with skill_name and File entries
      * @returns {Promise<{success: boolean, name: string, files_imported: string[]}>}
      */
     async files(formData) {
-      return API.request('/api/import/files', {
+      const skillName = formData.get('skill_name') || '';
+      const files = [];
+
+      const readAsBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // Strip "data:<mime>;base64," prefix
+          const result = String(reader.result || '');
+          const commaIdx = result.indexOf(',');
+          resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      for (const [key, value] of formData.entries()) {
+        if (key === 'skill_name') continue;
+        if (value instanceof File) {
+          // eslint-disable-next-line no-await-in-loop
+          const content = await readAsBase64(value);
+          files.push({ path: value.name, content, base64: true });
+        }
+      }
+
+      return API.request('/api/import/json', {
         method: 'POST',
-        body: formData,
+        body: { skill_name: skillName, files },
       });
     },
 

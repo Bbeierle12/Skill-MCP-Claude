@@ -1,0 +1,31 @@
+# Local development / self-host stack for the Skills Manager API.
+#
+# Quick start:
+#   docker compose up --build
+#
+# The skills/ directory in this repo is mounted into the container so changes
+# made through the UI persist locally and so new skills on disk are picked up
+# by the file watcher.
+#
+# Claude Code CLI integration (the /api/claude/* endpoints) is intentionally
+# NOT installed in the default image. Those endpoints will report
+# "Claude Code CLI not found" and the rest of the API will keep working.
+
+services:
+  skills-api:
+    build: .
+    image: skills-manager:latest
+    container_name: skills-manager-api
+    ports:
+      - "5050:5050"
+    environment:
+      SKILLS_DIR: /app/skills
+      HOST: 0.0.0.0
+      PORT: 5050
+      FLASK_DEBUG: "false"
+      # Tune Flask-Limiter rate limits (per-IP, in-memory store).
+      RATE_LIMIT_DEFAULT: 60/minute
+      RATE_LIMIT_WRITE: 10/minute
+    volumes:
+      - ./skills:/app/skills
+    restart: unless-stopped

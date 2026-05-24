@@ -6,6 +6,10 @@ fastmcp>=0.1.0
 # HTTP API Server
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0
+
+# Optional YAML frontmatter parsing
+PyYAML>=6.0
 
 # Build (optional)
 pyinstaller>=6.0.0
