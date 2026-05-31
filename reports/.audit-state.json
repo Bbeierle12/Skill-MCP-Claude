@@ -32,7 +32,8 @@
     "building-router": "C",
     "canvas-design": "B",
     "case-studies-reference": "A",
-    "component-library": "A"
+    "component-library": "A",
+    "d3js-visualization": "B"
   },
-  "saved_at": "2026-05-30"
+  "saved_at": "2026-05-31"
 }
