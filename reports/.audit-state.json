@@ -40,7 +40,8 @@
     "docx": "B",
     "form-accessibility": "B",
     "form-react": "A",
-    "form-security": "B"
+    "form-security": "B",
+    "form-ux-patterns": "B"
   },
-  "saved_at": "2026-06-07"
+  "saved_at": "2026-06-08"
 }
