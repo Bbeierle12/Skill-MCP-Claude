@@ -41,7 +41,8 @@
     "form-accessibility": "B",
     "form-react": "A",
     "form-security": "B",
-    "form-ux-patterns": "B"
+    "form-ux-patterns": "B",
+    "form-validation": "B"
   },
-  "saved_at": "2026-06-08"
+  "saved_at": "2026-06-09"
 }
