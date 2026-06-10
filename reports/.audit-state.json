@@ -42,7 +42,8 @@
     "form-react": "A",
     "form-security": "B",
     "form-ux-patterns": "B",
-    "form-validation": "B"
+    "form-validation": "B",
+    "form-vanilla": "B"
   },
-  "saved_at": "2026-06-09"
+  "saved_at": "2026-06-10"
 }
