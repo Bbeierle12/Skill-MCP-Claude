@@ -44,7 +44,8 @@
     "form-ux-patterns": "B",
     "form-validation": "B",
     "form-vanilla": "B",
-    "form-vue": "A"
+    "form-vue": "A",
+    "forms-router": "C"
   },
-  "saved_at": "2026-06-11"
+  "saved_at": "2026-06-12"
 }
