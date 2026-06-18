@@ -50,7 +50,8 @@
     "frontend-dev-guidelines": "A",
     "gsap-fundamentals": "B",
     "gsap-react": "A",
-    "gsap-router": "C"
+    "gsap-router": "C",
+    "gsap-scrolltrigger": "B"
   },
-  "saved_at": "2026-06-17"
+  "saved_at": "2026-06-18"
 }
