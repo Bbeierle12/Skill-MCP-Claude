@@ -51,7 +51,8 @@
     "gsap-fundamentals": "B",
     "gsap-react": "A",
     "gsap-router": "C",
-    "gsap-scrolltrigger": "B"
+    "gsap-scrolltrigger": "B",
+    "gsap-sequencing": "B"
   },
-  "saved_at": "2026-06-18"
+  "saved_at": "2026-06-19"
 }
