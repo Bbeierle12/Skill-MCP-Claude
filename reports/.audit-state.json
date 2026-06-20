@@ -52,7 +52,8 @@
     "gsap-react": "A",
     "gsap-router": "C",
     "gsap-scrolltrigger": "B",
-    "gsap-sequencing": "B"
+    "gsap-sequencing": "B",
+    "immersive-visuals-router": "A"
   },
-  "saved_at": "2026-06-19"
+  "saved_at": "2026-06-20"
 }
