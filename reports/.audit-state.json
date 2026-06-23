@@ -55,7 +55,8 @@
     "gsap-sequencing": "B",
     "immersive-visuals-router": "A",
     "internal-comms": "C",
-    "mcp-builder": "B"
+    "mcp-builder": "B",
+    "multiplayer-building": "B"
   },
-  "saved_at": "2026-06-22"
+  "saved_at": "2026-06-23"
 }
