@@ -56,7 +56,8 @@
     "immersive-visuals-router": "A",
     "internal-comms": "C",
     "mcp-builder": "B",
-    "multiplayer-building": "B"
+    "multiplayer-building": "B",
+    "particles-gpu": "A"
   },
-  "saved_at": "2026-06-23"
+  "saved_at": "2026-06-24"
 }
