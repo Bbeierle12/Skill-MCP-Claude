@@ -57,7 +57,8 @@
     "internal-comms": "C",
     "mcp-builder": "B",
     "multiplayer-building": "B",
-    "particles-gpu": "A"
+    "particles-gpu": "A",
+    "particles-lifecycle": "A"
   },
-  "saved_at": "2026-06-24"
+  "saved_at": "2026-06-25"
 }
