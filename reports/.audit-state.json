@@ -58,7 +58,8 @@
     "mcp-builder": "B",
     "multiplayer-building": "B",
     "particles-gpu": "A",
-    "particles-lifecycle": "A"
+    "particles-lifecycle": "A",
+    "particles-physics": "A"
   },
-  "saved_at": "2026-06-25"
+  "saved_at": "2026-06-26"
 }
