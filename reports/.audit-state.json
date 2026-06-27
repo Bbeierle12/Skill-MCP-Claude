@@ -59,7 +59,8 @@
     "multiplayer-building": "B",
     "particles-gpu": "A",
     "particles-lifecycle": "A",
-    "particles-physics": "A"
+    "particles-physics": "A",
+    "particles-router": "C"
   },
-  "saved_at": "2026-06-26"
+  "saved_at": "2026-06-27"
 }
