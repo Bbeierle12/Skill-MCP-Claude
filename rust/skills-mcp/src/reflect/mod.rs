@@ -23,10 +23,12 @@ mod cluster;
 mod normalize;
 mod schema;
 mod weight;
+pub mod synth;
 
 pub use cluster::{backfill_signatures, cluster_logs, fetch_unreflected, Cluster};
 pub use normalize::{cluster_key, normalize_signature};
 pub use schema::ensure_reflection_schema;
+pub use synth::synthesize;
 pub use weight::{
     cluster_weight, estimate_tokens, evaluate, proposed_skill_name, Mode, ReflectionConfig,
     SynthesisJob,
