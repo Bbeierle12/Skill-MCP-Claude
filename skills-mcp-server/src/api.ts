@@ -20,6 +20,7 @@ import fs from 'fs/promises';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 
 import { getSkillsDir, API_PORT, SKILL_FILE, META_FILE } from './constants.js';
 import { SkillIndexer, FileWatcher } from './services/index.js';
@@ -58,6 +59,13 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
+
+// Rate limiter for Claude CLI operations
+const claudeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: { error: 'Too many requests, please try again later' }
+});
 
 // ============================================================================
 // SKILLS API
@@ -570,7 +578,7 @@ app.post('/api/claude/run', asyncHandler(async (req: Request, res: Response) => 
 /**
  * POST /api/claude/generate-skill - Generate a new skill with Claude
  */
-app.post('/api/claude/generate-skill', asyncHandler(async (req: Request, res: Response) => {
+app.post('/api/claude/generate-skill', claudeLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { idea } = req.body;
 
   if (!idea) {
@@ -638,7 +646,7 @@ Return ONLY the SKILL.md content, no additional explanation.`;
 /**
  * POST /api/claude/improve-skill - Improve an existing skill with Claude
  */
-app.post('/api/claude/improve-skill', asyncHandler(async (req: Request, res: Response) => {
+app.post('/api/claude/improve-skill', claudeLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { name, request } = req.body;
 
   if (!name || !request) {

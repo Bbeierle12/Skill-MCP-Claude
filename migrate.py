@@ -165,12 +165,23 @@ def migrate_skill_archive(archive_path: Path, target_name: str = None) -> Path:
             # rejects sibling-prefix paths that startswith would miss.
             target = temp_dir.resolve()
             for entry in zf.namelist():
-                entry_path = (temp_dir / entry).resolve()
+                # Explicitly sanitize the entry name to prevent absolute path or traversal edge cases
+                sanitized_entry = entry.lstrip('/').lstrip('\\')
+                while '../' in sanitized_entry or '..\\' in sanitized_entry:
+                    sanitized_entry = sanitized_entry.replace('../', '').replace('..\\', '')
+                    
+                entry_path = (temp_dir / sanitized_entry).resolve()
                 try:
                     entry_path.relative_to(target)
                 except ValueError:
                     raise ValueError(f"Zip entry escapes target directory: {entry}")
-                zf.extract(entry, temp_dir)
+                
+                if entry.endswith('/'):
+                    entry_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    entry_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(entry) as source, open(entry_path, "wb") as dest:
+                        shutil.copyfileobj(source, dest)
 
         # Find the skill directory (usually the first directory in the archive)
         extracted_dirs = [d for d in temp_dir.iterdir() if d.is_dir()]
