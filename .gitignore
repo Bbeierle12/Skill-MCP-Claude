@@ -51,3 +51,11 @@ frontend/node_modules/
 frontend/coverage/
 frontend/dist/
 npm-debug.log*
+
+# Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
