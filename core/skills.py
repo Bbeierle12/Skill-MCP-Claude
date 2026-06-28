@@ -253,6 +253,12 @@ def import_folder(
 
     if not source.is_dir():
         return None, "Path must be a directory"
+        
+    try:
+        workspace_root = get_skills_dir().parent
+        source.resolve().relative_to(workspace_root.resolve())
+    except ValueError:
+        return None, "Import source must be within the workspace directory for security."
 
     # Determine skill name
     skill_name = sanitize_name(new_name) if new_name else sanitize_name(source.name)

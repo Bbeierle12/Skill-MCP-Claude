@@ -248,6 +248,14 @@ app.post('/api/import/folder', asyncHandler(async (req: Request, res: Response) 
 
   // Check source exists
   try {
+    const absSourcePath = path.resolve(sourcePath);
+    const workspaceRoot = path.resolve(skillsDir, '..');
+    
+    if (!absSourcePath.startsWith(workspaceRoot)) {
+      res.status(403).json({ error: 'Import source must be within the workspace directory for security.' });
+      return;
+    }
+
     const stat = await fs.stat(sourcePath);
     if (!stat.isDirectory()) {
       res.status(400).json({ error: 'Path must be a directory' });
@@ -433,30 +441,15 @@ app.post('/api/import/json', asyncHandler(async (req: Request, res: Response) =>
 app.get('/api/browse', asyncHandler(async (req: Request, res: Response) => {
   let browsePath = (req.query.path as string) || '';
 
-  // Handle Windows drives
-  if (!browsePath || browsePath === '/' || browsePath === '\\') {
-    // On Windows, list drive letters
-    if (process.platform === 'win32') {
-      const drives: string[] = [];
-      for (let i = 65; i <= 90; i++) {
-        const drive = `${String.fromCharCode(i)}:\\`;
-        try {
-          await fs.access(drive);
-          drives.push(drive);
-        } catch {
-          // Drive doesn't exist
-        }
-      }
-      res.json({
-        path: '',
-        parent: null,
-        directories: drives.map(d => ({ name: d, path: d })),
-        files: []
-      });
-      return;
-    }
-    browsePath = '/';
+  const absSkillsDir = path.resolve(skillsDir);
+  let targetPath = browsePath ? path.resolve(absSkillsDir, browsePath) : absSkillsDir;
+
+  if (!targetPath.startsWith(absSkillsDir)) {
+    res.status(403).json({ error: 'Permission denied' });
+    return;
   }
+  
+  browsePath = targetPath;
 
   try {
     const entries = await fs.readdir(browsePath, { withFileTypes: true });
