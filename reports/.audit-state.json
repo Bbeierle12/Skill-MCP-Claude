@@ -60,7 +60,8 @@
     "particles-gpu": "A",
     "particles-lifecycle": "A",
     "particles-physics": "A",
-    "particles-router": "C"
+    "particles-router": "C",
+    "pdf": "B"
   },
-  "saved_at": "2026-06-27"
+  "saved_at": "2026-06-28"
 }
