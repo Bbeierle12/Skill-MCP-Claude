@@ -4,7 +4,7 @@
 - [x] Initial Planning and Division of Labor completed.
 - [x] Phase 1: Rust Workspace Restructuring & Setup
 - [x] Phase 2: SQLite Database & Schema
-- [ ] Phase 3: The Ratatui Dashboard (TUI)
+- [x] Phase 3: The Ratatui Dashboard (TUI)
 - [ ] Phase 4: Axum / Tailscale Server Integration
 
 ---
@@ -39,9 +39,9 @@
 **Objective**: Construct the terminal interface that will visualize the AI's skills and the incoming log stream.
 
 **Tasks**:
-- [ ] Set up the `crossterm` event loop and terminal state management in `src/tui/app.rs`.
-- [ ] Design the UI Layout (Left pane: Skill / Log list, Right pane: Markdown / Trace viewer).
-- [ ] Hook the TUI up to the SQLite database to display the `experience_logs` in real-time.
+- [x] Set up the `crossterm` event loop and terminal state management in `src/tui/app.rs`.
+- [x] Design the UI Layout (Left pane: Skill / Log list, Right pane: Markdown / Trace viewer).
+- [x] Hook the TUI up to the SQLite database to display the `experience_logs` in real-time.
 
 **Test Gates**: 
 - `cargo run --bin skills-tui` launches a stable interface without panics, and keyboard events correctly quit the application.
