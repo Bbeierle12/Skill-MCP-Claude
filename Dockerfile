@@ -31,7 +31,7 @@ COPY skills ./skills
 
 # Default skills location inside the container (override with -e SKILLS_DIR=...).
 ENV SKILLS_DIR=/app/skills \
-    HOST=0.0.0.0 \
+    HOST=127.0.0.1 \
     PORT=5050 \
     FLASK_DEBUG=false
 

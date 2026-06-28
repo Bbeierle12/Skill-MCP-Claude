@@ -9,14 +9,14 @@
 //! For development or single-instance deployments, the Python API server
 //! includes built-in rate limiting (100 req/s per IP with burst of 200).
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use axum::{
     routing::{delete, get, post, put},
     Router,
 };
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -28,6 +28,7 @@ use super::routes::{self, AppState};
 /// HTTP API Server.
 pub struct ApiServer {
     state: AppState,
+    host: IpAddr,
     port: u16,
 }
 
@@ -42,6 +43,15 @@ impl ApiServer {
 
     /// Create a new API server with a specific port.
     pub fn with_port(skills_dir: impl AsRef<std::path::Path>, port: u16) -> Self {
+        Self::with_host_and_port(skills_dir, IpAddr::V4(Ipv4Addr::LOCALHOST), port)
+    }
+
+    /// Create a new API server with a specific host and port.
+    pub fn with_host_and_port(
+        skills_dir: impl AsRef<std::path::Path>,
+        host: IpAddr,
+        port: u16,
+    ) -> Self {
         let indexer = Arc::new(SkillIndexer::new(skills_dir));
 
         // Initial index load
@@ -52,7 +62,7 @@ impl ApiServer {
         let ctx = ServiceContext::new(indexer);
         let state = Arc::new(ctx);
 
-        Self { state, port }
+        Self { state, host, port }
     }
 
     /// Get the application state.
@@ -62,11 +72,10 @@ impl ApiServer {
 
     /// Build the router with all routes.
     pub fn router(&self) -> Router {
-        // CORS configuration
-        let cors = CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any);
+        // Default CORS is intentionally deny-by-default. Same-origin browser
+        // clients do not need CORS, and cross-origin clients should be fronted
+        // by an authenticated reverse proxy with explicit origin policy.
+        let cors = CorsLayer::new();
 
         // API routes
         let api_routes = Router::new()
@@ -89,7 +98,7 @@ impl ApiServer {
     /// Start the server.
     pub async fn run(&self) -> Result<(), ApiError> {
         let app = self.router();
-        let addr = SocketAddr::from(([0, 0, 0, 0], self.port));
+        let addr = SocketAddr::new(self.host, self.port);
 
         info!("Starting API server on http://{}", addr);
 
@@ -105,9 +114,12 @@ impl ApiServer {
     }
 
     /// Start the server with graceful shutdown.
-    pub async fn run_with_shutdown(&self, shutdown: impl std::future::Future<Output = ()> + Send + 'static) -> Result<(), ApiError> {
+    pub async fn run_with_shutdown(
+        &self,
+        shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+    ) -> Result<(), ApiError> {
         let app = self.router();
-        let addr = SocketAddr::from(([0, 0, 0, 0], self.port));
+        let addr = SocketAddr::new(self.host, self.port);
 
         info!("Starting API server on http://{}", addr);
 

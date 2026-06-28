@@ -22,8 +22,19 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 
-import { getSkillsDir, API_PORT, SKILL_FILE, META_FILE } from './constants.js';
+import { getSkillsDir, API_PORT, API_HOST, SKILL_FILE, META_FILE } from './constants.js';
 import { SkillIndexer, FileWatcher } from './services/index.js';
+import {
+  assertSafeSkillName,
+  createCorsOptions,
+  createOriginGuard,
+  defaultAllowedOrigins,
+  isPathInside,
+  minimalCommandEnv,
+  requireBearerAuth,
+  safeJoin,
+  safeRelativePath
+} from './utils/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,8 +50,16 @@ const upload = multer({
 
 // Create Express app
 const app = express();
-app.use(cors());
+const allowedOrigins = defaultAllowedOrigins([API_PORT, 3000]);
+app.use(createOriginGuard(allowedOrigins));
+app.use(cors(createCorsOptions(allowedOrigins)));
 app.use(express.json({ limit: '10mb' }));
+
+const requireApiAuth = requireBearerAuth({
+  tokenEnv: 'SKILLS_API_AUTH_TOKEN',
+  requiredEnv: 'SKILLS_API_AUTH_REQUIRED',
+  realm: 'skills-api'
+});
 
 // Serve static files (skills-manager.html)
 const htmlPath = path.resolve(__dirname, '..', '..', 'skills-manager.html');
@@ -70,6 +89,7 @@ const claudeLimiter = rateLimit({
 // ============================================================================
 // SKILLS API
 // ============================================================================
+app.use('/api', requireApiAuth);
 
 /**
  * GET /api/skills - List all skills
@@ -86,8 +106,15 @@ app.get('/api/skills', asyncHandler(async (_req: Request, res: Response) => {
  * GET /api/skills/:name - Get skill details
  */
 app.get('/api/skills/:name', asyncHandler(async (req: Request, res: Response) => {
-  const { name } = req.params;
-  const skillPath = path.join(skillsDir, name);
+  let name: string;
+  let skillPath: string;
+  try {
+    name = assertSafeSkillName(req.params.name);
+    skillPath = safeJoin(skillsDir, name);
+  } catch {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
 
   try {
     await fs.access(skillPath);
@@ -136,7 +163,12 @@ app.post('/api/skills', asyncHandler(async (req: Request, res: Response) => {
   }
 
   const sanitizedName = sanitizeName(name);
-  const skillPath = path.join(skillsDir, sanitizedName);
+  if (!sanitizedName) {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
+
+  const skillPath = safeJoin(skillsDir, assertSafeSkillName(sanitizedName));
 
   // Check if exists
   try {
@@ -180,10 +212,16 @@ app.post('/api/skills', asyncHandler(async (req: Request, res: Response) => {
  * PUT /api/skills/:name - Update skill
  */
 app.put('/api/skills/:name', asyncHandler(async (req: Request, res: Response) => {
-  const { name } = req.params;
+  let name: string;
+  let skillPath: string;
+  try {
+    name = assertSafeSkillName(req.params.name);
+    skillPath = safeJoin(skillsDir, name);
+  } catch {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
   const { description, tags, content } = req.body;
-
-  const skillPath = path.join(skillsDir, name);
 
   try {
     await fs.access(skillPath);
@@ -223,8 +261,15 @@ app.put('/api/skills/:name', asyncHandler(async (req: Request, res: Response) =>
  * DELETE /api/skills/:name - Delete skill
  */
 app.delete('/api/skills/:name', asyncHandler(async (req: Request, res: Response) => {
-  const { name } = req.params;
-  const skillPath = path.join(skillsDir, name);
+  let name: string;
+  let skillPath: string;
+  try {
+    name = assertSafeSkillName(req.params.name);
+    skillPath = safeJoin(skillsDir, name);
+  } catch {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
 
   try {
     await fs.access(skillPath);
@@ -254,17 +299,19 @@ app.post('/api/import/folder', asyncHandler(async (req: Request, res: Response) 
     return;
   }
 
+  let absSourcePath: string;
+
   // Check source exists
   try {
-    const absSourcePath = path.resolve(sourcePath);
-    const workspaceRoot = path.resolve(skillsDir, '..');
+    absSourcePath = await fs.realpath(path.resolve(sourcePath));
+    const workspaceRoot = await fs.realpath(path.resolve(skillsDir, '..'));
     
-    if (!absSourcePath.startsWith(workspaceRoot)) {
+    if (!isPathInside(workspaceRoot, absSourcePath)) {
       res.status(403).json({ error: 'Import source must be within the workspace directory for security.' });
       return;
     }
 
-    const stat = await fs.stat(sourcePath);
+    const stat = await fs.stat(absSourcePath);
     if (!stat.isDirectory()) {
       res.status(400).json({ error: 'Path must be a directory' });
       return;
@@ -275,9 +322,13 @@ app.post('/api/import/folder', asyncHandler(async (req: Request, res: Response) 
   }
 
   // Determine skill name
-  const folderName = path.basename(sourcePath);
+  const folderName = path.basename(absSourcePath);
   const sanitizedName = sanitizeName(folderName);
-  const destPath = path.join(skillsDir, sanitizedName);
+  if (!sanitizedName) {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
+  const destPath = safeJoin(skillsDir, assertSafeSkillName(sanitizedName));
 
   // Check if exists
   try {
@@ -292,7 +343,7 @@ app.post('/api/import/folder', asyncHandler(async (req: Request, res: Response) 
   }
 
   // Copy directory
-  await copyDir(sourcePath, destPath);
+  await copyDir(absSourcePath, destPath);
 
   // Ensure _meta.json exists
   const metaPath = path.join(destPath, META_FILE);
@@ -339,19 +390,25 @@ app.post('/api/import/files', upload.array('files'), asyncHandler(async (req: Re
   }
 
   const sanitizedName = sanitizeName(name);
-  const skillPath = path.join(skillsDir, sanitizedName);
+  if (!sanitizedName) {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
+  const skillPath = safeJoin(skillsDir, assertSafeSkillName(sanitizedName));
 
   // Create skill directory
   await fs.mkdir(skillPath, { recursive: true });
 
   // Write files
   for (const file of files) {
-    // Security: prevent path traversal
-    if (file.originalname.includes('..')) {
+    let relativePath: string;
+    try {
+      relativePath = safeRelativePath(file.originalname);
+    } catch {
       continue;
     }
 
-    const filePath = path.join(skillPath, file.originalname);
+    const filePath = safeJoin(skillPath, relativePath);
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(filePath, file.buffer);
@@ -393,19 +450,25 @@ app.post('/api/import/json', asyncHandler(async (req: Request, res: Response) =>
   }
 
   const sanitizedName = sanitizeName(name);
-  const skillPath = path.join(skillsDir, sanitizedName);
+  if (!sanitizedName) {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
+  const skillPath = safeJoin(skillsDir, assertSafeSkillName(sanitizedName));
 
   // Create skill directory
   await fs.mkdir(skillPath, { recursive: true });
 
   // Write files
   for (const file of files) {
-    // Security: prevent path traversal
-    if (file.path.includes('..')) {
+    let relativePath: string;
+    try {
+      relativePath = safeRelativePath(file.path);
+    } catch {
       continue;
     }
 
-    const filePath = path.join(skillPath, file.path);
+    const filePath = safeJoin(skillPath, relativePath);
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
 
@@ -450,9 +513,10 @@ app.get('/api/browse', asyncHandler(async (req: Request, res: Response) => {
   let browsePath = (req.query.path as string) || '';
 
   const absSkillsDir = path.resolve(skillsDir);
-  let targetPath = browsePath ? path.resolve(absSkillsDir, browsePath) : absSkillsDir;
-
-  if (!targetPath.startsWith(absSkillsDir)) {
+  let targetPath: string;
+  try {
+    targetPath = browsePath ? safeJoin(absSkillsDir, safeRelativePath(browsePath)) : absSkillsDir;
+  } catch {
     res.status(403).json({ error: 'Permission denied' });
     return;
   }
@@ -661,7 +725,13 @@ app.post('/api/claude/improve-skill', claudeLimiter, asyncHandler(async (req: Re
   }
 
   // Read current skill content
-  const skillPath = path.join(skillsDir, name, SKILL_FILE);
+  let skillPath: string;
+  try {
+    skillPath = safeJoin(skillsDir, assertSafeSkillName(name), SKILL_FILE);
+  } catch {
+    res.status(400).json({ error: 'Invalid skill name' });
+    return;
+  }
   let currentContent;
   try {
     currentContent = await fs.readFile(skillPath, 'utf-8');
@@ -749,6 +819,9 @@ async function countFiles(dir: string): Promise<number> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
+    if (entry.isSymbolicLink()) {
+      continue;
+    }
     if (entry.isDirectory()) {
       count += await countFiles(path.join(dir, entry.name));
     } else {
@@ -764,8 +837,12 @@ async function copyDir(src: string, dest: string): Promise<void> {
   const entries = await fs.readdir(src, { withFileTypes: true });
 
   for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    if (entry.isSymbolicLink()) {
+      continue;
+    }
+
+    const srcPath = safeJoin(src, entry.name);
+    const destPath = safeJoin(dest, entry.name);
 
     if (entry.isDirectory()) {
       await copyDir(srcPath, destPath);
@@ -809,7 +886,8 @@ function runCommand(cmd: string, args: string[], timeout: number, cwd?: string):
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, {
       cwd,
-      shell: true,
+      shell: false,
+      env: minimalCommandEnv(),
       timeout
     });
 
@@ -864,8 +942,8 @@ async function main(): Promise<void> {
   watcher.start();
 
   // Start server
-  app.listen(API_PORT, () => {
-    console.error(`[Skills API] Listening on http://localhost:${API_PORT}`);
+  app.listen(API_PORT, API_HOST, () => {
+    console.error(`[Skills API] Listening on http://${API_HOST}:${API_PORT}`);
   });
 }
 

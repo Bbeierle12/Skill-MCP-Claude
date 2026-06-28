@@ -17,10 +17,10 @@ services:
     image: skills-manager:latest
     container_name: skills-manager-api
     ports:
-      - "5050:5050"
+      - "127.0.0.1:5050:5050"
     environment:
       SKILLS_DIR: /app/skills
-      HOST: 0.0.0.0
+      HOST: 127.0.0.1
       PORT: 5050
       FLASK_DEBUG: "false"
       # Tune Flask-Limiter rate limits (per-IP, in-memory store).

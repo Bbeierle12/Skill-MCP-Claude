@@ -24,6 +24,15 @@ export function getSkillsDir(): string {
 /** Express API port */
 export const API_PORT = parseInt(process.env.API_PORT || '5050', 10);
 
+/** Express API bind host. Defaults to loopback to avoid accidental LAN exposure. */
+export const API_HOST = process.env.SKILLS_API_HOST || process.env.API_HOST || '127.0.0.1';
+
+/** MCP HTTP/SSE port */
+export const SSE_PORT = parseInt(process.env.SSE_PORT || '3001', 10);
+
+/** MCP HTTP/SSE bind host. Defaults to loopback to avoid accidental LAN exposure. */
+export const SSE_HOST = process.env.SKILLS_MCP_HOST || process.env.SSE_HOST || '127.0.0.1';
+
 /** File watcher debounce time in milliseconds */
 export const FILE_WATCHER_DEBOUNCE_MS = 500;
 

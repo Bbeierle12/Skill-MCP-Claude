@@ -22,12 +22,17 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
-import { getSkillsDir } from './constants.js';
+import { getSkillsDir, SSE_HOST, SSE_PORT } from './constants.js';
 import { SkillIndexer, SearchService, FileWatcher, StatsTracker } from './services/index.js';
 import { registerAllTools } from './tools/index.js';
 import type { ServiceContext } from './types.js';
-
-const SSE_PORT = parseInt(process.env.SSE_PORT || '3001', 10);
+import {
+  createCorsOptions,
+  createOriginGuard,
+  defaultAllowedOrigins,
+  envFlag,
+  requireBearerAuth
+} from './utils/security.js';
 
 // Store transports by session ID
 const transports: Record<string, SSEServerTransport | StreamableHTTPServerTransport> = {};
@@ -79,8 +84,15 @@ async function main(): Promise<void> {
 
   // Create Express app
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  const allowedOrigins = defaultAllowedOrigins([SSE_PORT]);
+  const requireMcpAuth = requireBearerAuth({
+    tokenEnv: 'SKILLS_MCP_AUTH_TOKEN',
+    requiredEnv: 'SKILLS_MCP_AUTH_REQUIRED',
+    realm: 'skills-mcp'
+  });
+  app.use(createOriginGuard(allowedOrigins));
+  app.use(cors(createCorsOptions(allowedOrigins)));
+  app.use(express.json({ limit: '1mb' }));
 
   // Health check endpoint
   app.get('/health', async (_req: Request, res: Response) => {
@@ -91,7 +103,7 @@ async function main(): Promise<void> {
   //=============================================================================
   // STREAMABLE HTTP TRANSPORT (PROTOCOL VERSION 2025-11-25)
   //=============================================================================
-  app.all('/mcp', async (req: Request, res: Response) => {
+  app.all('/mcp', requireMcpAuth, async (req: Request, res: Response) => {
     console.error(`[Skills MCP SSE] Received ${req.method} request to /mcp`);
 
     try {
@@ -164,69 +176,71 @@ async function main(): Promise<void> {
   // DEPRECATED HTTP+SSE TRANSPORT (PROTOCOL VERSION 2024-11-05)
   // Kept for backwards compatibility with older clients
   //=============================================================================
-  app.get('/sse', async (_req: Request, res: Response) => {
-    console.error('[Skills MCP SSE] Received GET request to /sse');
+  if (envFlag('SKILLS_ENABLE_LEGACY_SSE', false)) {
+    app.get('/sse', requireMcpAuth, async (_req: Request, res: Response) => {
+      console.error('[Skills MCP SSE] Received GET request to /sse');
 
-    try {
-      const transport = new SSEServerTransport('/messages', res);
-      transports[transport.sessionId] = transport;
+      try {
+        const transport = new SSEServerTransport('/messages', res);
+        transports[transport.sessionId] = transport;
 
-      transport.onclose = () => {
-        console.error(`[Skills MCP SSE] SSE transport closed for session ${transport.sessionId}`);
-        delete transports[transport.sessionId];
-      };
+        transport.onclose = () => {
+          console.error(`[Skills MCP SSE] SSE transport closed for session ${transport.sessionId}`);
+          delete transports[transport.sessionId];
+        };
 
-      const server = createServer();
-      await server.connect(transport);
-      console.error(`[Skills MCP SSE] Established SSE stream with session ID: ${transport.sessionId}`);
-    } catch (error) {
-      console.error('[Skills MCP SSE] Error establishing SSE stream:', error);
-      if (!res.headersSent) {
-        res.status(500).send('Error establishing SSE stream');
+        const server = createServer();
+        await server.connect(transport);
+        console.error(`[Skills MCP SSE] Established SSE stream with session ID: ${transport.sessionId}`);
+      } catch (error) {
+        console.error('[Skills MCP SSE] Error establishing SSE stream:', error);
+        if (!res.headersSent) {
+          res.status(500).send('Error establishing SSE stream');
+        }
       }
-    }
-  });
+    });
 
-  app.post('/messages', async (req: Request, res: Response) => {
-    console.error('[Skills MCP SSE] Received POST request to /messages');
+    app.post('/messages', requireMcpAuth, async (req: Request, res: Response) => {
+      console.error('[Skills MCP SSE] Received POST request to /messages');
 
-    const sessionId = req.query.sessionId as string;
-    if (!sessionId) {
-      res.status(400).send('Missing sessionId parameter');
-      return;
-    }
-
-    const transport = transports[sessionId];
-    if (!transport || !(transport instanceof SSEServerTransport)) {
-      res.status(404).send('Session not found');
-      return;
-    }
-
-    try {
-      await transport.handlePostMessage(req, res, req.body);
-    } catch (error) {
-      console.error('[Skills MCP SSE] Error handling request:', error);
-      if (!res.headersSent) {
-        res.status(500).send('Error handling request');
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) {
+        res.status(400).send('Missing sessionId parameter');
+        return;
       }
-    }
-  });
+
+      const transport = transports[sessionId];
+      if (!transport || !(transport instanceof SSEServerTransport)) {
+        res.status(404).send('Session not found');
+        return;
+      }
+
+      try {
+        await transport.handlePostMessage(req, res, req.body);
+      } catch (error) {
+        console.error('[Skills MCP SSE] Error handling request:', error);
+        if (!res.headersSent) {
+          res.status(500).send('Error handling request');
+        }
+      }
+    });
+  }
 
   // Start server
-  app.listen(SSE_PORT, () => {
-    console.error(`[Skills MCP SSE] Listening on http://localhost:${SSE_PORT}`);
+  app.listen(SSE_PORT, SSE_HOST, () => {
+    console.error(`[Skills MCP SSE] Listening on http://${SSE_HOST}:${SSE_PORT}`);
     console.error(`
 ==============================================
 CLAUDE.AI CONNECTOR SETUP:
 
-1. Deploy this server to a public URL (e.g., ngrok, Railway, Render)
-2. In Claude.ai, go to Settings > Connectors
-3. Add new connector with URL: https://your-domain.com/sse
-   OR for newer protocol: https://your-domain.com/mcp
+1. Set SKILLS_MCP_AUTH_TOKEN to a long random value before using HTTP transport.
+2. Keep the default ${SSE_HOST} bind unless you intentionally put this behind
+   authenticated TLS reverse proxy.
+3. Add new connector with URL: https://your-domain.com/mcp.
+   Legacy /sse is disabled unless SKILLS_ENABLE_LEGACY_SSE=true.
 
 LOCAL TESTING:
 - Health check: http://localhost:${SSE_PORT}/health
-- SSE endpoint: http://localhost:${SSE_PORT}/sse
 - Streamable HTTP: http://localhost:${SSE_PORT}/mcp
 ==============================================
 `);

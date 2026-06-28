@@ -2,6 +2,7 @@
 //!
 //! Run with: cargo run --bin skills-api-server -- [OPTIONS]
 
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -24,6 +25,10 @@ struct Args {
     #[arg(short, long, default_value = "5050", env = "PORT")]
     port: u16,
 
+    /// Host/IP address to bind. Defaults to loopback to avoid accidental LAN exposure.
+    #[arg(long, default_value = "127.0.0.1", env = "HOST")]
+    host: IpAddr,
+
     /// Enable debug logging
     #[arg(short, long)]
     debug: bool,
@@ -41,7 +46,9 @@ async fn main() -> anyhow::Result<()> {
     };
 
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into()),
+        )
         .with(tracing_subscriber::fmt::layer().with_target(false))
         .init();
 
@@ -64,12 +71,13 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Skills directory: {:?}", skills_dir);
     info!(
-        "Starting Skills API Server v{} on port {}",
+        "Starting Skills API Server v{} on {}:{}",
         skills_mcp::VERSION,
+        args.host,
         args.port
     );
 
-    let server = ApiServer::with_port(&skills_dir, args.port);
+    let server = ApiServer::with_host_and_port(&skills_dir, args.host, args.port);
 
     // Set up graceful shutdown
     let shutdown = async {
