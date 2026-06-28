@@ -18,6 +18,10 @@ path = "src/bin/server.rs"
 name = "skills-api-server"
 path = "src/bin/api.rs"
 
+[[bin]]
+name = "skills-tui"
+path = "src/bin/tui.rs"
+
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -65,6 +69,13 @@ globset = "0.4"
 clap = { version = "4", features = ["derive", "env"] }
 dirs = "5"
 jsonschema = "0.46.5"
+
+# TUI
+ratatui = "0.30"
+crossterm = "0.28"
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
 
 [dev-dependencies]
 tempfile = "3"

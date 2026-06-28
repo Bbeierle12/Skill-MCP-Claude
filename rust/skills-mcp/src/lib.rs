@@ -97,6 +97,7 @@
 #![warn(clippy::all)]
 
 pub mod api;
+pub mod db;
 pub mod index;
 pub mod mcp;
 pub mod models;
