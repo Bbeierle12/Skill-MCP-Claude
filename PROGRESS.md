@@ -5,7 +5,7 @@
 - [x] Phase 1: Rust Workspace Restructuring & Setup
 - [x] Phase 2: SQLite Database & Schema
 - [x] Phase 3: The Ratatui Dashboard (TUI)
-- [ ] Phase 4: Axum / Tailscale Server Integration
+- [x] Phase 4: Axum / Tailscale Server Integration
 
 ---
 
@@ -52,9 +52,9 @@
 **Objective**: Expose the MCP tools and log-ingestion API so that agents on other Tailscale nodes can write to the memory vault.
 
 **Tasks**:
-- [ ] Configure the Axum HTTP server in `src/server/mod.rs`.
-- [ ] Create endpoints (e.g., `/api/logs`) that accept JSON payloads from agents and route them to the SQLite DB.
-- [ ] Add configuration to allow binding explicitly to the Tailscale network interface (`100.x.x.x`).
+- [x] Integrate `MemoryVault` safely into the Axum server's `ServiceContext` via `Arc<Mutex<MemoryVault>>`.
+- [x] Expose a `POST /api/logs` endpoint in `src/api/routes.rs` that accepts JSON logs from external agents.
+- [x] Ensure the Axum server can bind correctly to the `0.0.0.0` or Tailscale IP for network ingestion.
 
 **Test Gates**: 
 - Start the server and simulate an agent request using `curl`. Verify the request receives a 200 OK and the data appears in the SQLite DB.

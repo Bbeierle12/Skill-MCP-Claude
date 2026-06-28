@@ -20,6 +20,8 @@ pub struct ServiceContext {
     pub search: SearchService,
     /// Usage statistics tracker.
     pub stats: Arc<parking_lot::RwLock<UsageStats>>,
+    /// Agent memory vault.
+    pub vault: Arc<parking_lot::Mutex<crate::db::MemoryVault>>,
 }
 
 impl ServiceContext {
@@ -27,11 +29,14 @@ impl ServiceContext {
     pub fn new(indexer: Arc<SkillIndexer>) -> Self {
         let search = SearchService::new(Arc::clone(&indexer));
         let stats = Arc::new(parking_lot::RwLock::new(UsageStats::new()));
+        let vault_db = crate::db::MemoryVault::new("memory_vault.db").unwrap_or_else(|_| crate::db::MemoryVault::new(":memory:").unwrap());
+        let vault = Arc::new(parking_lot::Mutex::new(vault_db));
 
         Self {
             indexer,
             search,
             stats,
+            vault,
         }
     }
 

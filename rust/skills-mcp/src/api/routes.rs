@@ -729,3 +729,41 @@ pub async fn search_skills(
 
     Ok(Json(results))
 }
+
+// ============================================================================
+// POST /api/logs - Log an agent experience
+// ============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct LogExperienceRequest {
+    pub task_context: String,
+    pub error_trace: Option<String>,
+    pub resolution: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LogExperienceResponse {
+    pub id: i64,
+    pub success: bool,
+}
+
+pub async fn log_experience(
+    State(state): State<AppState>,
+    Json(req): Json<LogExperienceRequest>,
+) -> Result<Json<LogExperienceResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let vault = state.vault.lock();
+    let id = vault
+        .log_experience(
+            &req.task_context,
+            req.error_trace.as_deref(),
+            req.resolution.as_deref(),
+        )
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse::new(format!("Failed to log experience: {}", e))),
+            )
+        })?;
+
+    Ok(Json(LogExperienceResponse { id, success: true }))
+}

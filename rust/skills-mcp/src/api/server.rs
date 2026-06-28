@@ -76,7 +76,8 @@ impl ApiServer {
             .route("/skills/:name", put(routes::update_skill))
             .route("/skills/:name", delete(routes::delete_skill))
             .route("/reload", post(routes::reload_index))
-            .route("/search", get(routes::search_skills));
+            .route("/search", get(routes::search_skills))
+            .route("/logs", post(routes::log_experience));
 
         Router::new()
             .nest("/api", api_routes)
