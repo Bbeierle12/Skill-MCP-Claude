@@ -76,6 +76,9 @@ OUTPUT CONTRACT — emit EXACTLY one fenced block per file, no prose outside the
   ```file:_meta.json
   <valid _meta.json>
   ```
+  ```file:scripts/verify.sh   (OPTIONAL — only if a precondition is checkable)
+  <POSIX sh, exit 0 = ready, non-zero = not ready, remediation on stderr>
+  ```
 "#;
 
     let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
@@ -132,6 +135,44 @@ OUTPUT CONTRACT — emit EXACTLY one fenced block per file, no prose outside the
         return Err(anyhow::anyhow!("Invalid _meta.json"));
     }
 
+    // Process verify script if present
+    let mut verify_script_name = None;
+    if parsed.contains_key("scripts/verify.sh") {
+        verify_script_name = Some("scripts/verify.sh");
+    } else if parsed.contains_key("scripts/verify.py") {
+        verify_script_name = Some("scripts/verify.py");
+    }
+
+    if let Some(script_name) = verify_script_name {
+        let script_content = &parsed[script_name];
+        
+        // Safety scan
+        let destructive = ["rm -rf /", "dd ", "mkfs", "curl | sh", "curl | bash", "wget | sh", "wget | bash"];
+        for bad in &destructive {
+            if script_content.contains(bad) {
+                conn.execute(
+                    "UPDATE synthesis_jobs SET status = 'rejected', note = ?1 WHERE cluster_key = ?2",
+                    params![format!("Safety scan failed: contains '{}'", bad), job.cluster_key],
+                )?;
+                return Err(anyhow::anyhow!("Safety scan failed"));
+            }
+        }
+        
+        let scripts_dir = temp_dir.join("scripts");
+        fs::create_dir_all(&scripts_dir)?;
+        let script_path = temp_dir.join(script_name);
+        fs::write(&script_path, script_content)?;
+        
+        // Make executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&script_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&script_path, perms)?;
+        }
+    }
+
     // 6. Branch and commit (using git worktree)
     // git worktree add reflect/<cluster_key>-<date>
     let branch_name = format!("reflect/{}", job.cluster_key);
@@ -156,6 +197,31 @@ OUTPUT CONTRACT — emit EXACTLY one fenced block per file, no prose outside the
     fs::create_dir_all(&skill_dir)?;
     fs::copy(temp_dir.join("SKILL.md"), skill_dir.join("SKILL.md"))?;
     fs::copy(temp_dir.join("_meta.json"), skill_dir.join("_meta.json"))?;
+
+    if let Some(script_name) = verify_script_name {
+        let dest_scripts = skill_dir.join("scripts");
+        fs::create_dir_all(&dest_scripts)?;
+        let script_dest = skill_dir.join(script_name);
+        fs::copy(temp_dir.join(script_name), &script_dest)?;
+
+        // Run verification in worktree
+        let verify_res = Command::new(&script_dest)
+            .current_dir(&worktree_path)
+            .output()?;
+        
+        // We expect exit code 0 or 1. If it crashes (e.g. exit 127 for not found, or SIGSEGV) we reject.
+        // Also if it exits 1, it should have printed "VERIFY: " to stdout or stderr.
+        let status_code = verify_res.status.code().unwrap_or(255);
+        if status_code != 0 && status_code != 1 {
+            conn.execute(
+                "UPDATE synthesis_jobs SET status = 'rejected', note = ?1 WHERE cluster_key = ?2",
+                params![format!("Verify script crashed with code {}", status_code), job.cluster_key],
+            )?;
+            let _ = Command::new("git").arg("worktree").arg("remove").arg("-f").arg(&worktree_path).current_dir(workspace_root).output();
+            let _ = fs::remove_dir_all(&temp_dir);
+            return Err(anyhow::anyhow!("Verify script crashed"));
+        }
+    }
 
     // Commit
     Command::new("git").args(["add", "."]).current_dir(&worktree_path).output()?;
