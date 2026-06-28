@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/Bbeierle12/Skill-MCP-Claude/schema/meta.schema.json",
   "title": "_meta.json",
-  "description": "Canonical contract for a skill's _meta.json (schema v2.0). This is the single source of truth: the Python (jsonschema) and TypeScript (ajv) validators both validate against THIS file. Do not redefine the field set anywhere else.",
+  "description": "Canonical contract for a skill's _meta.json (schema v2.1). This is the single source of truth: the Python (jsonschema) and TypeScript (ajv) validators both validate against THIS file. Do not redefine the field set anywhere else.",
   "type": "object",
   "required": ["name", "description"],
   "additionalProperties": false,
@@ -81,6 +81,15 @@
       "type": ["string", "null"],
       "enum": ["A", "B", "C", "D", null],
       "description": "Model-capability relevance tier, or null if unassigned. Written by the audit system."
+    },
+    "failure_signatures": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Normalized error signatures this skill resolves (schema v2.1). Join key to the `## Failure → Fix` table. Used for O(1) error→skill lookup. Written by the reflection engine."
+    },
+    "cluster_key": {
+      "type": ["string", "null"],
+      "description": "Stable hash of the log cluster that generated/last-updated this skill (schema v2.1). Idempotency key so reflection updates an existing skill instead of forking a duplicate. Null for hand-authored skills."
     }
   }
 }

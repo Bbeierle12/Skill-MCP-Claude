@@ -11,5 +11,7 @@
   "enhances": ["dashboard"],
   "last_reviewed_at": "2026-05-24",
   "review_score": 72,
-  "relevance_tier": "B"
+  "relevance_tier": "B",
+  "failure_signatures": ["cargo build cant find crate", "linker cc failed"],
+  "cluster_key": "sha1:9f2a4b8c1d3e"
 }

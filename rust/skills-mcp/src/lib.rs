@@ -101,6 +101,7 @@ pub mod db;
 pub mod index;
 pub mod mcp;
 pub mod models;
+pub mod reflect;
 pub mod search;
 pub mod tui;
 pub mod validation;
