@@ -61,7 +61,8 @@
     "particles-lifecycle": "A",
     "particles-physics": "A",
     "particles-router": "C",
-    "pdf": "B"
+    "pdf": "B",
+    "performance-at-scale": "A"
   },
-  "saved_at": "2026-06-28"
+  "saved_at": "2026-06-29"
 }
