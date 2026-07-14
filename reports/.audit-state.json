@@ -75,7 +75,8 @@
     "r3f-geometry": "A",
     "r3f-materials": "A",
     "r3f-performance": "A",
-    "r3f-router": "A"
+    "r3f-router": "A",
+    "router-template": "B"
   },
-  "saved_at": "2026-07-13"
+  "saved_at": "2026-07-14"
 }
