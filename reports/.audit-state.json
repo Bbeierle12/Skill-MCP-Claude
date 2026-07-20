@@ -81,7 +81,8 @@
     "shader-effects": "A",
     "shader-fundamentals": "A",
     "shader-noise": "A",
-    "shader-router": "A"
+    "shader-router": "A",
+    "shader-sdf": "A"
   },
-  "saved_at": "2026-07-19"
+  "saved_at": "2026-07-20"
 }
