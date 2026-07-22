@@ -83,7 +83,8 @@
     "shader-noise": "A",
     "shader-router": "A",
     "shader-sdf": "A",
-    "skill-creator": "B"
+    "skill-creator": "B",
+    "slack-gif-creator": "B"
   },
-  "saved_at": "2026-07-21"
+  "saved_at": "2026-07-22"
 }
