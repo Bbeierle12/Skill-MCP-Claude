@@ -89,7 +89,8 @@
     "structural-physics": "B",
     "subagent-driven-development": "B",
     "systematic-debugging": "B",
-    "terrain-integration": "B"
+    "terrain-integration": "B",
+    "test-driven-development": "B"
   },
-  "saved_at": "2026-07-27"
+  "saved_at": "2026-07-28"
 }
