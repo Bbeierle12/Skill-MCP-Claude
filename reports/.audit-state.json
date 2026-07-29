@@ -90,7 +90,8 @@
     "subagent-driven-development": "B",
     "systematic-debugging": "B",
     "terrain-integration": "B",
-    "test-driven-development": "B"
+    "test-driven-development": "B",
+    "theme-factory": "C"
   },
-  "saved_at": "2026-07-28"
+  "saved_at": "2026-07-29"
 }
