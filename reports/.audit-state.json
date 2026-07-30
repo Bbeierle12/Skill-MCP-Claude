@@ -91,7 +91,8 @@
     "systematic-debugging": "B",
     "terrain-integration": "B",
     "test-driven-development": "B",
-    "theme-factory": "C"
+    "theme-factory": "C",
+    "using-git-worktrees": "B"
   },
-  "saved_at": "2026-07-29"
+  "saved_at": "2026-07-30"
 }
