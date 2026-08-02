@@ -94,7 +94,8 @@
     "theme-factory": "C",
     "using-git-worktrees": "B",
     "web-artifacts-builder": "A",
-    "writing-plans": "B"
+    "writing-plans": "B",
+    "xlsx": "B"
   },
-  "saved_at": "2026-08-01"
+  "saved_at": "2026-08-02"
 }
